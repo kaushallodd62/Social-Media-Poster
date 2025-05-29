@@ -48,11 +48,12 @@ function createPhotoCard(photo) {
     
     card.innerHTML = `
         <div class="relative aspect-w-16 aspect-h-9">
-            <img src="${photo.baseUrl}" 
+            <img src="${photo.baseUrl}"
                  alt="${photo.filename}"
                  class="w-full h-48 object-cover cursor-pointer"
                  onclick="openPhotoModal('${photo.id}')">
             ${photo.isFavorite ? '<span class="absolute top-2 right-2 bg-yellow-400 text-white px-2 py-1 rounded-full text-sm">Favorite</span>' : ''}
+            ${typeof photo.score === 'number' ? `<span class="score-badge">${(photo.score * 100).toFixed(0)}</span>` : ''}
         </div>
         <div class="p-4">
             <h3 class="text-sm font-medium text-gray-900 truncate">${photo.filename}</h3>
@@ -71,10 +72,17 @@ async function openPhotoModal(photoId) {
     const modal = document.getElementById('photoModal');
     const modalImage = document.getElementById('modalImage');
     const favoriteBadge = document.getElementById('favoriteBadge');
+    const scoreDisplay = document.getElementById('scoreDisplay');
     const captionInput = document.getElementById('captionInput');
 
     modalImage.src = selectedPhoto.baseUrl;
     favoriteBadge.style.display = selectedPhoto.isFavorite ? 'block' : 'none';
+    if (typeof selectedPhoto.score === 'number') {
+        scoreDisplay.textContent = 'Score: ' + (selectedPhoto.score * 100).toFixed(0);
+        scoreDisplay.style.display = 'block';
+    } else {
+        scoreDisplay.style.display = 'none';
+    }
     captionInput.value = ''; // Clear previous caption
 
     modal.classList.remove('hidden');
@@ -83,7 +91,9 @@ async function openPhotoModal(photoId) {
 // Function to close the photo modal
 function closeModal() {
     const modal = document.getElementById('photoModal');
+    const scoreDisplay = document.getElementById('scoreDisplay');
     modal.classList.add('hidden');
+    scoreDisplay.style.display = 'none';
     selectedPhoto = null;
 }
 

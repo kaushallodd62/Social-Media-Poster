@@ -1,15 +1,25 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify
 from photo_fetcher import authenticate, fetch_media_items
-import os
-from PIL import Image
-import io
-import base64
+from ranking_service import RankingService
 from datetime import datetime
+from io import BytesIO
+from PIL import Image
+import requests
 
 app = Flask(__name__)
 
 # Initialize Google Photos service
 service = None
+ranking = RankingService()
+
+def load_image(url: str) -> Image.Image | None:
+    """Fetch an image from ``url`` and return a PIL Image."""
+    try:
+        resp = requests.get(url)
+        resp.raise_for_status()
+        return Image.open(BytesIO(resp.content))
+    except Exception:
+        return None
 
 def get_photo_service():
     global service
@@ -25,25 +35,38 @@ def index():
 def get_photos():
     try:
         service = get_photo_service()
-        # Fetch both favorites and recent photos
         favorites = fetch_media_items(service, favorites_only=True, page_size=30)
         recent = fetch_media_items(service, favorites_only=False, page_size=50)
-        
-        # Combine and deduplicate photos
+
         combined = favorites + [item for item in recent if item not in favorites]
-        
-        # Format the response
-        photos = []
+
+        items = []
         for photo in combined[:20]:  # Limit to 20 photos for now
+            is_fav = photo in favorites
+            metadata = {
+                'creation_time': datetime.fromisoformat(
+                    photo['mediaMetadata']['creationTime'].replace('Z', '+00:00')
+                ),
+                'is_favorite': is_fav,
+            }
+            img = load_image(photo['baseUrl'] + '=w256-h256')
+            items.append({'image': img, 'metadata': metadata, 'photo': photo})
+
+        ranked = ranking.rank_images(items)
+
+        photos = []
+        for item in ranked:
+            photo = item['photo']
             photos.append({
                 'id': photo['id'],
                 'filename': photo['filename'],
                 'creationTime': photo['mediaMetadata']['creationTime'],
                 'mimeType': photo['mimeType'],
                 'baseUrl': photo['baseUrl'],
-                'isFavorite': photo in favorites
+                'isFavorite': item['metadata']['is_favorite'],
+                'score': round(item['total_score'], 4),
             })
-        
+
         return jsonify({'success': True, 'photos': photos})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
