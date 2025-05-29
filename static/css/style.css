@@ -51,3 +51,8 @@
     bottom: 0.5rem;
     right: 0.5rem;
 }
+
+/* List for displaying individual scores */
+#scoreList li {
+    margin-left: 1rem;
+}
