@@ -1,0 +1,41 @@
+/* Custom styles */
+.aspect-w-16 {
+    position: relative;
+    padding-bottom: 56.25%; /* 16:9 Aspect Ratio */
+}
+
+.aspect-w-16 > * {
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+}
+
+/* Smooth transitions */
+.transition-shadow {
+    transition: box-shadow 0.3s ease-in-out;
+}
+
+/* Modal animations */
+#photoModal {
+    transition: opacity 0.3s ease-in-out;
+}
+
+#photoModal.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+} 
