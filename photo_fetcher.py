@@ -56,11 +56,13 @@ def get_favorites_album_id(service):
             pageToken=next_page_token
         ).execute()
         for album in response.get('albums', []):
-            if album.get('title', '').lower() == 'favorites':
+            print(f"Found album: {album.get('title', '')}")  # Debug log
+            if album.get('title', '').lower() in ['favorites', 'favorite']:
                 return album['id']
         next_page_token = response.get('nextPageToken')
         if not next_page_token:
             break
+    print("No Favorites album found in available albums")  # Debug log
     return None
 
 
