@@ -57,6 +57,7 @@ def get_photos():
         photos = []
         for item in ranked:
             photo = item['photo']
+            score_details = {k: round(v, 4) for k, v in item['scores'].items()}
             photos.append({
                 'id': photo['id'],
                 'filename': photo['filename'],
@@ -65,6 +66,7 @@ def get_photos():
                 'baseUrl': photo['baseUrl'],
                 'isFavorite': item['metadata']['is_favorite'],
                 'score': round(item['total_score'], 4),
+                'scores': score_details,
             })
 
         return jsonify({'success': True, 'photos': photos})

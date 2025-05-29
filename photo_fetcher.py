@@ -45,46 +45,21 @@ def authenticate():
         raise
 
 
-def get_favorites_album_id(service):
-    """
-    Retrieves the album ID for the user's Favorites album.
-    """
-    next_page_token = None
-    while True:
-        response = service.albums().list(
-            pageSize=50,
-            pageToken=next_page_token
-        ).execute()
-        for album in response.get('albums', []):
-            print(f"Found album: {album.get('title', '')}")  # Debug log
-            if album.get('title', '').lower() in ['favorites', 'favorite']:
-                return album['id']
-        next_page_token = response.get('nextPageToken')
-        if not next_page_token:
-            break
-    print("No Favorites album found in available albums")  # Debug log
-    return None
-
-
 def fetch_media_items(service, favorites_only=False, page_size=50):
     """
-    Fetches media items. If `favorites_only`, fetches only from the Favorites album.
-    Otherwise, retrieves the latest `page_size` items, sorted by reverse creationTime.
+    Fetches media items. If ``favorites_only`` is ``True`` the returned list only
+    contains items that have the ``isFavorite`` flag set. Otherwise the latest
+    ``page_size`` items are returned sorted by reverse ``creationTime``.
     """
-    items = []
+    response = service.mediaItems().list(pageSize=page_size).execute()
+    items = response.get('mediaItems', [])
+
+    # Sort by creationTime descending
+    items.sort(key=lambda x: x['mediaMetadata']['creationTime'], reverse=True)
+
     if favorites_only:
-        fav_id = get_favorites_album_id(service)
-        if not fav_id:
-            print("No Favorites album found.")
-            return []
-        body = {'albumId': fav_id, 'pageSize': page_size}
-        response = service.mediaItems().search(body=body).execute()
-        items = response.get('mediaItems', [])
-    else:
-        response = service.mediaItems().list(pageSize=page_size).execute()
-        items = response.get('mediaItems', [])
-        # Sort by creationTime descending
-        items.sort(key=lambda x: x['mediaMetadata']['creationTime'], reverse=True)
+        items = [item for item in items if item.get('isFavorite')]
+
     return items
 
 

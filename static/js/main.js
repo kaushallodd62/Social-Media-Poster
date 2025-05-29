@@ -32,6 +32,8 @@ function renderPhotoGrid() {
     const grid = document.getElementById('photoGrid');
     grid.innerHTML = '';
 
+    currentPhotos.sort((a, b) => (b.score || 0) - (a.score || 0));
+
     currentPhotos.forEach(photo => {
         const photoCard = createPhotoCard(photo);
         grid.appendChild(photoCard);
@@ -73,6 +75,7 @@ async function openPhotoModal(photoId) {
     const modalImage = document.getElementById('modalImage');
     const favoriteBadge = document.getElementById('favoriteBadge');
     const scoreDisplay = document.getElementById('scoreDisplay');
+    const scoreList = document.getElementById('scoreList');
     const captionInput = document.getElementById('captionInput');
 
     modalImage.src = selectedPhoto.baseUrl;
@@ -80,8 +83,20 @@ async function openPhotoModal(photoId) {
     if (typeof selectedPhoto.score === 'number') {
         scoreDisplay.textContent = 'Score: ' + (selectedPhoto.score * 100).toFixed(0);
         scoreDisplay.style.display = 'block';
+        scoreList.innerHTML = '';
+        if (selectedPhoto.scores) {
+            for (const [key, val] of Object.entries(selectedPhoto.scores)) {
+                const li = document.createElement('li');
+                li.textContent = `${key}: ${(val * 100).toFixed(0)}`;
+                scoreList.appendChild(li);
+            }
+            scoreList.style.display = 'block';
+        } else {
+            scoreList.style.display = 'none';
+        }
     } else {
         scoreDisplay.style.display = 'none';
+        scoreList.style.display = 'none';
     }
     captionInput.value = ''; // Clear previous caption
 
@@ -92,8 +107,10 @@ async function openPhotoModal(photoId) {
 function closeModal() {
     const modal = document.getElementById('photoModal');
     const scoreDisplay = document.getElementById('scoreDisplay');
+    const scoreList = document.getElementById('scoreList');
     modal.classList.add('hidden');
     scoreDisplay.style.display = 'none';
+    scoreList.style.display = 'none';
     selectedPhoto = null;
 }
 
