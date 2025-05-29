@@ -38,4 +38,16 @@
 
 .animate-spin {
     animation: spin 1s linear infinite;
-} 
+}
+
+/* Badge displaying ranking score */
+.score-badge {
+    background-color: #3B82F6;
+    color: #ffffff;
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    position: absolute;
+    bottom: 0.5rem;
+    right: 0.5rem;
+}
