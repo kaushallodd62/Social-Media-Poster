@@ -151,7 +151,8 @@ class RankingService:
         created: Optional[datetime] = metadata.get("creation_time")
         if not isinstance(created, datetime):
             return 0.0
-        days = (datetime.now() - created).days
+        now = datetime.now(created.tzinfo)
+        days = (now - created).days
         return max(0.0, 1.0 - days / 30.0)
 
     def compute_favorite_score(self, metadata: Dict[str, Any]) -> float:
