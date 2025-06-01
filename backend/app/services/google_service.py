@@ -34,7 +34,7 @@ class GoogleService:
             include_granted_scopes=include_granted_scopes
         )[0]
 
-    def get_tokens(self, code):
+    def get_tokens(self, code, scopes=None):
         """Exchange authorization code for tokens"""
         flow = Flow.from_client_config(
             {
@@ -45,7 +45,7 @@ class GoogleService:
                     "token_uri": "https://oauth2.googleapis.com/token",
                 }
             },
-            scopes=self.scopes,
+            scopes=scopes or self.scopes,
             redirect_uri=self.redirect_uri
         )
         

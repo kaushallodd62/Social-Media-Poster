@@ -50,6 +50,7 @@ class Config:
 
     # CORS Configuration
     CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
+    FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 
     # Logging Configuration
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')

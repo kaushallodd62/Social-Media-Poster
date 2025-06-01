@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 import secrets
 import string
 from functools import wraps
+from app.config import Config
 
 auth_bp = Blueprint('auth', __name__)
 google_service = GoogleService()
@@ -49,7 +50,11 @@ def get_google_auth_url():
     """Get Google OAuth URL for login"""
     try:
         url = google_service.get_auth_url(
-            scopes=['openid', 'email', 'profile'],
+            scopes=[
+                'openid',
+                'https://www.googleapis.com/auth/userinfo.email',
+                'https://www.googleapis.com/auth/userinfo.profile'
+            ],
             access_type='offline',
             include_granted_scopes='true'
         )
@@ -67,22 +72,28 @@ def google_callback():
         
         if not code:
             return redirect(
-                url_for('frontend.auth_callback', error='No code provided')
+                f"{Config.FRONTEND_URL}/auth/callback?error=No code provided"
             )
 
         # Exchange code for tokens and get user info
-        tokens = google_service.get_tokens(code)
+        tokens = google_service.get_tokens(
+            code,
+            scopes=[
+                'openid',
+                'https://www.googleapis.com/auth/userinfo.email',
+                'https://www.googleapis.com/auth/userinfo.profile'
+            ]
+        )
         if not tokens or not tokens.get('access_token'):
             return redirect(
-                url_for('frontend.auth_callback', error='Failed to get access token')
+                f"{Config.FRONTEND_URL}/auth/callback?error=Failed to get access token"
             )
 
         try:
             user_info = google_service.get_user_info(tokens['access_token'])
         except Exception as e:
             return redirect(
-                url_for('frontend.auth_callback', 
-                       error=f'Failed to get user info: {str(e)}')
+                f"{Config.FRONTEND_URL}/auth/callback?error=Failed to get user info: {str(e)}"
             )
 
         # Get or create user
@@ -128,14 +139,12 @@ def google_callback():
 
         # Redirect to frontend with tokens
         return redirect(
-            url_for('frontend.auth_callback',
-                   token=access_token,
-                   refresh_token=refresh_token)
+            f"{Config.FRONTEND_URL}/auth/callback?token={access_token}&refresh_token={refresh_token}"
         )
 
     except Exception as e:
         db.session.rollback()
-        return redirect(url_for('frontend.auth_callback', error=str(e)))
+        return redirect(f"{Config.FRONTEND_URL}/auth/callback?error={str(e)}")
 
 # Email/Password Authentication Routes
 @auth_bp.route('/api/auth/register', methods=['POST'])
@@ -333,7 +342,10 @@ def google_photos_callback():
             )
 
         # Exchange code for tokens
-        tokens = google_service.get_tokens(code)
+        tokens = google_service.get_tokens(
+            code,
+            scopes=['https://www.googleapis.com/auth/photoslibrary.readonly']
+        )
         
         # Store tokens in database
         user = User.query.get(user_id)
