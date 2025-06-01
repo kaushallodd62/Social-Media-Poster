@@ -2,7 +2,7 @@
 
 Revision ID: initial_migration
 Revises: 
-Create Date: 2024-03-19 00:00:00.000000
+Create Date: 2024-03-23 00:00:00.000000
 
 """
 from alembic import op
@@ -20,11 +20,20 @@ def upgrade() -> None:
     op.create_table('users',
         sa.Column('id', sa.BigInteger(), nullable=False),
         sa.Column('email', sa.String(length=320), nullable=False),
+        sa.Column('password_hash', sa.String(length=255), nullable=True),
         sa.Column('display_name', sa.String(length=100), nullable=True),
+        sa.Column('profile_picture', sa.String(length=500), nullable=True),
+        sa.Column('is_active', sa.Boolean(), server_default='true', nullable=False),
+        sa.Column('is_verified', sa.Boolean(), server_default='false', nullable=False),
+        sa.Column('verification_token', sa.String(length=100), nullable=True),
+        sa.Column('reset_password_token', sa.String(length=100), nullable=True),
+        sa.Column('reset_password_expires', sa.DateTime(timezone=True), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
         sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('email')
+        sa.UniqueConstraint('email'),
+        sa.UniqueConstraint('verification_token'),
+        sa.UniqueConstraint('reset_password_token')
     )
 
     # Create oauth_credentials table

@@ -12,7 +12,6 @@ class GoogleService:
         self.client_id = Config.GOOGLE_CLIENT_ID
         self.client_secret = Config.GOOGLE_CLIENT_SECRET
         self.redirect_uri = Config.GOOGLE_REDIRECT_URI
-        self.scopes = Config.GOOGLE_AUTH_SCOPES.split(',')
 
     def get_auth_url(self, scopes=None, access_type='offline', include_granted_scopes='true'):
         """Get Google OAuth URL"""
@@ -25,7 +24,7 @@ class GoogleService:
                     "token_uri": "https://oauth2.googleapis.com/token",
                 }
             },
-            scopes=scopes or self.scopes,
+            scopes=scopes,
             redirect_uri=self.redirect_uri
         )
         
@@ -34,7 +33,7 @@ class GoogleService:
             include_granted_scopes=include_granted_scopes
         )[0]
 
-    def get_tokens(self, code, scopes=None):
+    def get_tokens(self, auth_code, scopes=None):
         """Exchange authorization code for tokens"""
         flow = Flow.from_client_config(
             {
@@ -45,15 +44,15 @@ class GoogleService:
                     "token_uri": "https://oauth2.googleapis.com/token",
                 }
             },
-            scopes=scopes or self.scopes,
+            scopes=scopes,
             redirect_uri=self.redirect_uri
         )
         
-        flow.fetch_token(code=code)
+        flow.fetch_token(code=auth_code)
         return {
             'access_token': flow.credentials.token,
             'refresh_token': flow.credentials.refresh_token,
-            'token_type': flow.credentials.token_type,
+            'token_type': 'Bearer', # Google always returns Bearer
             'expires_in': flow.credentials.expiry.timestamp() if flow.credentials.expiry else None
         }
 
@@ -101,7 +100,7 @@ class GoogleService:
                 token_uri="https://oauth2.googleapis.com/token",
                 client_id=self.client_id,
                 client_secret=self.client_secret,
-                scopes=self.scopes
+                scopes=credentials.scopes
             )
 
             if creds.expired:
@@ -120,5 +119,5 @@ class GoogleService:
             token_uri="https://oauth2.googleapis.com/token",
             client_id=self.client_id,
             client_secret=self.client_secret,
-            scopes=self.scopes
+            scopes=credentials.scopes
         ) 

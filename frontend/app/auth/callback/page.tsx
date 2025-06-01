@@ -20,7 +20,8 @@ export default function AuthCallbackPage() {
     }
 
     if (token) {
-      localStorage.setItem('token', token);
+      // Set token as a cookie with 7-day expiration for development
+      document.cookie = `token=${token}; path=/; max-age=604800; samesite=lax`;
       router.push('/dashboard');
     } else {
       setError('No token received');

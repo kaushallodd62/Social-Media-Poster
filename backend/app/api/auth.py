@@ -56,7 +56,7 @@ def get_google_auth_url():
                 'https://www.googleapis.com/auth/userinfo.profile'
             ],
             access_type='offline',
-            include_granted_scopes='true'
+            include_granted_scopes='false'
         )
         return jsonify({'url': url})
     except Exception as e:
@@ -68,7 +68,7 @@ def google_callback():
     try:
         # Get authorization code from request
         code = request.args.get('code')
-        # state = request.args.get('state')  # For CSRF protection
+        state = request.args.get('state')  # For CSRF protection
         
         if not code:
             return redirect(
@@ -77,7 +77,7 @@ def google_callback():
 
         # Exchange code for tokens and get user info
         tokens = google_service.get_tokens(
-            code,
+            auth_code=code,
             scopes=[
                 'openid',
                 'https://www.googleapis.com/auth/userinfo.email',
@@ -103,7 +103,7 @@ def google_callback():
             user = User(
                 email=user_info['email'],
                 display_name=user_info.get('name', user_info['email'].split('@')[0]),
-                is_verified=True,  # Google emails are verified
+                is_verified=user_info.get('verified_email', False),
                 profile_picture=user_info.get('picture')
             )
             db.session.add(user)
@@ -124,7 +124,7 @@ def google_callback():
         
         oauth_cred.access_token = tokens['access_token']
         oauth_cred.refresh_token = tokens.get('refresh_token')
-        oauth_cred.token_type = tokens.get('token_type', 'Bearer')
+        oauth_cred.token_type = tokens.get('token_type') # Google always returns Bearer
         oauth_cred.token_expires_at = (
             datetime.fromtimestamp(tokens.get('expires_in'))
             if tokens.get('expires_in') else None
@@ -144,7 +144,8 @@ def google_callback():
 
     except Exception as e:
         db.session.rollback()
-        return redirect(f"{Config.FRONTEND_URL}/auth/callback?error={str(e)}")
+        error_message = str(e).replace('\n', ' ').strip()  # Remove newlines and extra whitespace
+        return redirect(f"{Config.FRONTEND_URL}/auth/callback?error={error_message}")
 
 # Email/Password Authentication Routes
 @auth_bp.route('/api/auth/register', methods=['POST'])
