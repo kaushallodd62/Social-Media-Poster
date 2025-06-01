@@ -203,17 +203,17 @@ def login():
             return jsonify({'message': 'Please verify your email first'}), 401
             
         access_token = create_access_token(identity=user.id)
-        refresh_token = create_refresh_token(identity=user.id)
         
-        return jsonify({
+        response = jsonify({
             'access_token': access_token,
-            'refresh_token': refresh_token,
             'user': {
                 'id': user.id,
                 'email': user.email,
                 'display_name': user.display_name
             }
         })
+        
+        return response
     except Exception as e:
         return jsonify({'message': str(e)}), 500
 

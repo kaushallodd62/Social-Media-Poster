@@ -2,12 +2,13 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './styles/globals.css'
 import { AuthProvider } from './contexts/AuthContext'
+import { ThemeProvider } from './components/ThemeProvider'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Social Media Poster Dashboard',
-  description: 'Manage and schedule your social media posts',
+  title: 'Social Media Poster',
+  description: 'Schedule and manage your social media posts with ease',
 }
 
 export default function RootLayout({
@@ -16,13 +17,13 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <AuthProvider>
-          <div className="min-h-screen bg-gray-100">
+        <ThemeProvider>
+          <AuthProvider>
             {children}
-          </div>
-        </AuthProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

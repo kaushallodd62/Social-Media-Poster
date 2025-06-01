@@ -9,6 +9,8 @@ const publicPaths = [
   '/auth/reset-password',
   '/auth/callback',
   '/api/auth',
+  '/', // Allow landing page
+  '/pricing', // Allow pricing page
 ];
 
 export function middleware(request: NextRequest) {
@@ -16,7 +18,17 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Check if the path is public
-  const isPublicPath = publicPaths.some(path => pathname.startsWith(path));
+  const isPublicPath = publicPaths.some(path => pathname === path || pathname.startsWith(path + '/'));
+
+  // Redirect / to /dashboard if logged in
+  if (pathname === '/' && token) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
+  }
+
+  // Redirect /auth/login and /auth/register to /dashboard if already logged in
+  if ((pathname === '/auth/login' || pathname === '/auth/register') && token) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
+  }
 
   // If the path is public, allow access
   if (isPublicPath) {

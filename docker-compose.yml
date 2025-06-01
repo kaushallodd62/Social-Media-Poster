@@ -33,7 +33,6 @@ services:
     volumes:
       - ./backend:/app
       - ./backend/migrations:/app/migrations
-      - ./backend/alembic.ini:/app/alembic.ini
     depends_on:
       postgres:
         condition: service_healthy

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import { Button, LoadingSpinner, Alert } from '@/app/components/ui';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -33,17 +33,13 @@ export default function AuthCallbackPage() {
       <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
           <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded">
-              {error}
-            </div>
-            <div className="mt-6">
-              <Link
-                href="/auth/login"
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Return to Login
-              </Link>
-            </div>
+            <Alert type="error" message={error} className="mb-6" />
+            <Button
+              onClick={() => router.push('/auth/login')}
+              className="w-full"
+            >
+              Return to Login
+            </Button>
           </div>
         </div>
       </div>
@@ -60,6 +56,9 @@ export default function AuthCallbackPage() {
           <p className="mt-2 text-sm text-gray-600">
             Please wait while we complete your sign in.
           </p>
+          <div className="mt-8">
+            <LoadingSpinner size="lg" />
+          </div>
         </div>
       </div>
     </div>

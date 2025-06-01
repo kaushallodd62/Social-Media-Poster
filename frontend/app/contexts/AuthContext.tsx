@@ -1,9 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
-interface User {
+export interface User {
   id: number;
   email: string;
   display_name: string;
@@ -30,38 +30,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    // Check for token in localStorage
-    const storedToken = localStorage.getItem('token');
-    if (storedToken) {
-      setToken(storedToken);
-      fetchUser(storedToken);
+    const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
+    const cookieToken = match ? decodeURIComponent(match[1]) : null;
+    console.log('Token from cookie:', cookieToken ? 'Found' : 'Not found');
+    if (cookieToken) {
+      setToken(cookieToken);
     } else {
       setLoading(false);
     }
   }, []);
 
-  const fetchUser = async (authToken: string) => {
+  const fetchUser = useCallback(async () => {
     try {
+      if (!token) {
+        console.log('No token available for fetchUser');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Fetching user with token...');
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
       });
       
       if (response.ok) {
         const userData = await response.json();
+        console.log('User data fetched successfully:', userData);
         setUser(userData);
       } else {
-        // Token is invalid, clear it
-        localStorage.removeItem('token');
+        const errorData = await response.json();
+        console.error('Error fetching user:', errorData);
         setToken(null);
+        document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
       }
     } catch (error) {
       console.error('Error fetching user:', error);
+      setToken(null);
+      document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      fetchUser();
+    }
+  }, [token, fetchUser]);
 
   const login = async (email: string, password: string) => {
     try {
@@ -71,6 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password }),
+        credentials: 'include',
       });
 
       const data = await response.json();
@@ -79,8 +99,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(data.message || 'Login failed');
       }
 
-      localStorage.setItem('token', data.token);
-      setToken(data.token);
+      // Set the token in state and cookie
+      setToken(data.access_token);
+      document.cookie = `token=${data.access_token}; path=/; max-age=86400`; // 24 hours
       setUser(data.user);
       router.push('/dashboard');
     } catch (error) {
@@ -112,7 +133,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    // Clear the token cookie
+    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    // Clear state
     setToken(null);
     setUser(null);
     router.push('/auth/login');

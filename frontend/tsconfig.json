@@ -19,9 +19,23 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
-    }
+      "@/*": ["./app/*"],
+      "@components/*": ["./app/components/*"],
+      "@hooks/*": ["./app/hooks/*"],
+      "@utils/*": ["./app/utils/*"],
+      "@constants/*": ["./app/constants/*"],
+      "@types/*": ["./app/types/*"],
+      "@styles/*": ["./app/styles/*"],
+      "@lib/*": ["./app/lib/*"]
+    },
+    "types": ["jest", "@testing-library/jest-dom"]
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "jest.setup.js"
+  ],
   "exclude": ["node_modules"]
 } 
