@@ -7,10 +7,7 @@ import cohere
 import requests
 import base64
 from typing import Any, Dict, List
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
+from app.config import Config
 
 class LLMBasedRankingService:
     """
@@ -22,10 +19,10 @@ class LLMBasedRankingService:
         """
         :param model_name: the Cohere vision-capable model to call
         """
-        api_key = os.getenv("COHERE_API_KEY")
+        api_key = Config.COHERE_API_KEY
         if not api_key:
             raise ValueError("Please set COHERE_API_KEY in your .env file")
-        self.client = cohere.ClientV2(api_key=api_key)
+        self.client = cohere.Client(api_key=api_key)
         self.model = model_name
 
     def _download_and_encode_image(self, image_url: str) -> str:

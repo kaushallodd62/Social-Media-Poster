@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   PhotoIcon, 
   CalendarIcon, 
@@ -10,9 +10,26 @@ import {
   ArrowPathIcon
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import { photosApi } from './lib/api';
 
 export default function Dashboard() {
-  const [isConnected, setIsConnected] = useState(false);
+  const [isPhotosConnected, setIsPhotosConnected] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkPhotosConnection = async () => {
+      try {
+        const isConnected = await photosApi.checkConnection();
+        setIsPhotosConnected(isConnected);
+      } catch (error) {
+        setIsPhotosConnected(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkPhotosConnection();
+  }, []);
 
   const dashboardSections = [
     {
@@ -20,15 +37,17 @@ export default function Dashboard() {
       description: 'Connect your Google Photos account',
       icon: PhotoIcon,
       href: '/photos',
-      status: isConnected ? 'Connected' : 'Not Connected',
-      action: isConnected ? 'Manage' : 'Connect'
+      status: loading ? 'Checking...' : (isPhotosConnected ? 'Connected' : 'Not Connected'),
+      statusColor: loading ? 'text-gray-500' : (isPhotosConnected ? 'text-green-500' : 'text-red-500'),
+      action: isPhotosConnected ? 'Manage' : 'Connect'
     },
     {
       title: 'Top Picks',
       description: 'View and filter your best photos',
       icon: ArrowPathIcon,
       href: '/top-picks',
-      status: 'Ready',
+      status: 'Coming Soon',
+      statusColor: 'text-gray-500',
       action: 'View'
     },
     {
@@ -36,7 +55,8 @@ export default function Dashboard() {
       description: 'Edit and enhance your photos',
       icon: PencilSquareIcon,
       href: '/editor',
-      status: 'Ready',
+      status: 'Coming Soon',
+      statusColor: 'text-gray-500',
       action: 'Edit'
     },
     {
@@ -44,7 +64,8 @@ export default function Dashboard() {
       description: 'Generate and edit captions',
       icon: PencilSquareIcon,
       href: '/captions',
-      status: 'Ready',
+      status: 'Coming Soon',
+      statusColor: 'text-gray-500',
       action: 'Generate'
     },
     {
@@ -52,7 +73,8 @@ export default function Dashboard() {
       description: 'Schedule and monitor posts',
       icon: CalendarIcon,
       href: '/scheduler',
-      status: 'Ready',
+      status: 'Coming Soon',
+      statusColor: 'text-gray-500',
       action: 'Schedule'
     },
     {
@@ -60,7 +82,8 @@ export default function Dashboard() {
       description: 'View post performance metrics',
       icon: ChartBarIcon,
       href: '/analytics',
-      status: 'Ready',
+      status: 'Coming Soon',
+      statusColor: 'text-gray-500',
       action: 'View'
     }
   ];
@@ -87,7 +110,9 @@ export default function Dashboard() {
                     <p className="text-sm text-gray-500">{section.description}</p>
                   </div>
                 </div>
-                <span className="text-sm text-gray-500">{section.status}</span>
+                <span className={`text-sm font-medium ${section.statusColor}`}>
+                  {section.status}
+                </span>
               </div>
               <div className="mt-4">
                 <Link 
