@@ -14,12 +14,38 @@ mail = Mail()
 def init_extensions(app):
     """Initialize all Flask extensions with the app"""
     db.init_app(app)
-    cors.init_app(app, resources={r"/api/*": {
+    
+    # Configure CORS
+    cors_config = {
         "origins": app.config['CORS_ORIGINS'],
         "supports_credentials": True,
-        "allow_headers": ["Content-Type", "Authorization"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    }})
+        "allow_headers": [
+            "Content-Type",
+            "Authorization",
+            "X-Requested-With",
+            "Accept",
+            "Origin",
+            "Access-Control-Request-Method",
+            "Access-Control-Request-Headers"
+        ],
+        "expose_headers": ["Content-Type", "Authorization"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "max_age": 3600  # Cache preflight requests for 1 hour
+    }
+    
+    # In development, allow all origins
+    if app.config['FLASK_ENV'] == 'development':
+        # Allow both localhost:3000 and localhost:5001 (Docker mapped port)
+        cors_config["origins"] = [
+            "http://localhost:3000",
+            "http://localhost:5001",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:5001"
+        ]
+        cors_config["supports_credentials"] = True
+    
+    cors.init_app(app, resources={r"/api/*": cors_config})
+    
     migrate.init_app(app, db)
     jwt.init_app(app)
     mail.init_app(app)

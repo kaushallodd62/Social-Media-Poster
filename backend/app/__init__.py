@@ -1,8 +1,8 @@
 from flask import Flask, jsonify
-from .extensions import db, cors, migrate, jwt, mail
+from .extensions import db, cors, migrate, jwt, mail, init_extensions
 from .models import User, OAuthCredentials, MediaItem, RankingSession, MediaRanking
 from .services import GoogleService, LLMBasedRankingService, authenticate, fetch_media_items
-from .api import auth_bp, routes_bp, register_routes
+from .api import auth_bp, routes_bp
 from .config import Config
 
 def create_app(config_class=Config):
@@ -11,14 +11,7 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
 
     # Initialize extensions
-    db.init_app(app)
-    cors.init_app(app, resources={r"/api/*": {
-        "origins": app.config['CORS_ORIGINS'],
-        "supports_credentials": True,
-        "allow_headers": ["Content-Type", "Authorization"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    }})
-    migrate.init_app(app, db)
+    init_extensions(app)
     
     # Configure JWT
     app.config['JWT_SECRET_KEY'] = Config.SECRET_KEY
@@ -49,14 +42,14 @@ def create_app(config_class=Config):
             'error': 'token_expired'
         }), 401
 
-    jwt.init_app(app)
-    mail.init_app(app)
-
     # Register blueprints
     app.register_blueprint(auth_bp)
+    app.register_blueprint(routes_bp)
 
-    # Register routes
-    register_routes(app)
+    # Register CLI commands
+    with app.app_context():
+        from flask_migrate import Migrate
+        migrate = Migrate(app, db)
 
     return app
 
@@ -69,10 +62,4 @@ __all__ = [
     
     # Services
     'GoogleService', 'LLMBasedRankingService', 'authenticate', 'fetch_media_items',
-    
-    # API
-    'auth_bp', 'routes_bp', 'register_routes',
-    
-    # App factory
-    'create_app'
 ]
