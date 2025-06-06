@@ -62,27 +62,27 @@ export default function Topbar() {
   }
 
   return (
-    <header className="w-full bg-white dark:bg-gray-900 shadow flex items-center justify-between px-8 py-4">
+    <header className="w-full bg-white dark:bg-gray-900 shadow flex items-center justify-between px-8 py-4 transition-colors duration-300">
       <div className="flex items-center space-x-6">
         <Link 
           href="/dashboard" 
-          className="text-lg font-semibold text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition"
+          className="text-lg font-semibold text-gray-800 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
         >
           Dashboard
         </Link>
         <input
           type="text"
           placeholder="Search..."
-          className="w-72 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white dark:border-gray-700"
+          className="w-72 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white dark:border-gray-700 transition-colors"
         />
       </div>
       <div className="flex items-center space-x-4">
         <button
-          className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+          className={`w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200 ${theme === 'dark' ? 'ring-2 ring-blue-400' : ''}`}
           onClick={toggleTheme}
           aria-label="Toggle theme"
         >
-          {theme === 'dark' ? <SunIcon className="h-6 w-6" /> : <MoonIcon className="h-6 w-6" />}
+          {theme === 'dark' ? <SunIcon className="h-6 w-6 text-yellow-400" /> : <MoonIcon className="h-6 w-6 text-blue-600" />}
         </button>
         <div className="relative" ref={avatarRef}>
           <button

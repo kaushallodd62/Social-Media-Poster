@@ -14,9 +14,10 @@
   }
 }
 
-body {
+body, html {
   color: rgb(var(--foreground-rgb));
   background: rgb(var(--background-rgb));
+  transition: background 0.3s, color 0.3s;
 }
 
 @layer components {

@@ -1,6 +1,5 @@
 'use client';
 
-import Sidebar from '../components/Sidebar';
 import Topbar from '../components/Topbar';
 import { useAuth } from '../contexts/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -34,12 +33,9 @@ export default function AuthenticatedLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-h-screen lg:ml-0">
-        <Topbar />
-        <main className="flex-1 p-4 lg:p-8 bg-gray-100">{children}</main>
-      </div>
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-950 flex flex-col transition-colors duration-300">
+      <Topbar />
+      <main className="flex-1 p-4 lg:p-8 bg-gray-100 dark:bg-gray-950 transition-colors duration-300">{children}</main>
     </div>
   );
 } 

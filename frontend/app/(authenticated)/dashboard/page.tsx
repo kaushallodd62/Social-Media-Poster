@@ -77,25 +77,25 @@ export default function Dashboard() {
 
   return (
     <div>
-      <div className="mb-8">
+      <div className="mb-8 transition-colors duration-300">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">
           Manage your social media content and analytics
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-colors duration-300">
         {dashboardSections.map((section) => (
-          <div key={section.title} className="dashboard-card">
+          <div key={section.title} className="dashboard-card transition-colors duration-300">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <section.icon className="h-8 w-8 text-blue-600" />
+                <section.icon className="h-8 w-8 text-primary-600 dark:text-primary-400" />
                 <div className="ml-4">
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{section.title}</h2>
                   <p className="text-sm text-gray-500 dark:text-gray-400">{section.description}</p>
                 </div>
               </div>
-              <span className={`text-sm px-2 py-1 rounded-full ${
+              <span className={`text-sm px-2 py-1 rounded-full transition-colors duration-200 ${
                 section.status === 'Connected' 
                   ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                   : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
@@ -116,9 +116,9 @@ export default function Dashboard() {
       </div>
 
       {/* Recent Activity */}
-      <div className="mt-8">
+      <div className="mt-8 transition-colors duration-300">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Activity</h2>
-        <div className="dashboard-card">
+        <div className="dashboard-card transition-colors duration-300">
           <div className="space-y-4">
             <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
               <ClockIcon className="h-5 w-5 mr-2" />

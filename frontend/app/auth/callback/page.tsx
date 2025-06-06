@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Button, LoadingSpinner, Alert } from '@/app/components/ui';
+import { Button, LoadingSpinner, Alert } from '../../components/ui';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
