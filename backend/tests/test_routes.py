@@ -1,14 +1,26 @@
 import pytest
 from flask import Flask
 from app import create_app
+from app.extensions import db
+from app.models.user import User
+from sqlalchemy.orm import scoped_session, sessionmaker
 import uuid
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope='function')
 def test_client():
     app = create_app()
     app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
+    with app.app_context():
+        connection = db.engine.connect()
+        transaction = connection.begin()
+        session_factory = sessionmaker(bind=connection)
+        sess = scoped_session(session_factory)
+        db.session = sess
+        with app.test_client() as client:
+            yield client
+        transaction.rollback()
+        connection.close()
+        sess.remove()
 
 def test_health_check(test_client):
     response = test_client.get('/api/health')
@@ -25,6 +37,12 @@ def test_register_and_login(test_client):
     }
     response = test_client.post('/api/auth/register', json=payload)
     assert response.status_code in (200, 201, 400)  # 400 if already registered
+    # Set user as verified
+    with test_client.application.app_context():
+        user = User.query.filter_by(email=payload['email']).first()
+        if user and not user.is_verified:
+            user.is_verified = True
+            db.session.commit()
     # Login
     login_payload = {
         'email': 'testuser@example.com',
@@ -71,6 +89,12 @@ def get_jwt_token(client, email, password, name="Test User"):  # Helper for test
         'password': password,
         'name': name
     })
+    # Set user as verified
+    with client.application.app_context():
+        user = User.query.filter_by(email=email).first()
+        if user and not user.is_verified:
+            user.is_verified = True
+            db.session.commit()
     resp = client.post('/api/auth/login', json={
         'email': email,
         'password': password

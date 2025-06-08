@@ -9,16 +9,19 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def create_app(config_class: Type[Config] = Config) -> Flask:
+def create_app(config_class: Type[Config] = Config, test_config: dict = None) -> Flask:
     """
     Create and configure the Flask application.
     Args:
         config_class (Type[Config]): The configuration class to use.
+        test_config (dict, optional): Additional config overrides (e.g., for testing).
     Returns:
         Flask: The configured Flask application instance.
     """
     app = Flask(__name__)
     app.config.from_object(config_class)
+    if test_config:
+        app.config.update(test_config)
 
     # Initialize extensions
     init_extensions(app)
