@@ -1,0 +1,6 @@
+---
+description: Use this rule whenever running the app, migrations, and tests
+globs: 
+alwaysApply: false
+---
+- The app always runs using Docker Compose. All commands, including running the app, migrations, and tests, should be executed via Docker Compose, not directly on the local machine. Do not run backend or frontend services directly with local Python or Node commands; always use the appropriate docker compose service.
