@@ -1,32 +1,41 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Button, LoadingSpinner, Alert } from '../../components/ui';
+
+function parseHashFragment() {
+  const hash = typeof window !== 'undefined' ? window.location.hash.substring(1) : '';
+  const params: Record<string, string> = {};
+  hash.split('&').forEach(pair => {
+    const [key, value] = pair.split('=');
+    if (key) params[key] = decodeURIComponent(value || '');
+  });
+  return params;
+}
 
 export default function AuthCallbackPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    const error = searchParams.get('error');
-    const message = searchParams.get('message');
+    const params = parseHashFragment();
+    const token = params['token'];
+    const error = params['error'];
 
     if (error) {
-      setError(message || error);
+      setError(error);
       return;
     }
 
     if (token) {
-      // Set token as a cookie with 7-day expiration for development
-      document.cookie = `token=${token}; path=/; max-age=604800; samesite=lax`;
+      // Set token as a cookie with 1-hour expiration
+      document.cookie = `token=${token}; path=/; max-age=3600; samesite=lax`;
       router.push('/dashboard');
     } else {
       setError('No token received');
     }
-  }, [searchParams, router]);
+  }, [router]);
 
   if (error) {
     return (

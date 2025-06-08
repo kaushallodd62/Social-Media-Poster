@@ -3,6 +3,11 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from flask_mail import Mail
+from flask import Flask
+from typing import Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Initialize extensions
 db = SQLAlchemy()
@@ -11,8 +16,12 @@ migrate = Migrate()
 jwt = JWTManager()
 mail = Mail()
 
-def init_extensions(app):
-    """Initialize all Flask extensions with the app"""
+def init_extensions(app: Flask) -> None:
+    """
+    Initialize all Flask extensions with the app.
+    Args:
+        app (Flask): The Flask application instance.
+    """
     db.init_app(app)
     
     # Configure CORS

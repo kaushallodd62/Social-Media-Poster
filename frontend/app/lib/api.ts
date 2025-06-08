@@ -8,7 +8,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // Enable sending cookies
+  // withCredentials: true, // Only needed for refresh endpoint
 });
 
 // Helper function to get token from cookies
@@ -30,19 +30,38 @@ api.interceptors.request.use((config) => {
 // Add response interceptor for better error handling
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     console.error('API Error:', {
       status: error.response?.status,
       data: error.response?.data,
       message: error.message,
     });
     
-    // If unauthorized, clear the token cookie
+    // If unauthorized, try to refresh the token
     if (error.response?.status === 401) {
-      document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      // Optionally redirect to login
-      if (typeof window !== 'undefined') {
-        window.location.href = '/auth/login';
+      try {
+        // Attempt to refresh the access token (send cookies only for this request)
+        const refreshResponse = await axios.post(
+          '/api/auth/refresh',
+          {},
+          { withCredentials: true }
+        );
+        const newToken = refreshResponse.data.access_token;
+        if (newToken) {
+          // Set new token as a cookie with 1-hour expiration
+          document.cookie = `token=${newToken}; path=/; max-age=3600; samesite=lax`;
+          // Retry the original request with the new token
+          const config = error.config;
+          config.headers = config.headers || {};
+          config.headers.Authorization = `Bearer ${newToken}`;
+          return api.request(config);
+        }
+      } catch (refreshError) {
+        // If refresh fails, clear the token and redirect to login
+        document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        if (typeof window !== 'undefined') {
+          window.location.href = '/auth/login';
+        }
       }
     }
     
@@ -157,31 +176,12 @@ export const authApi = {
     }
   },
 
-  getGooglePhotosAuthUrl: async (): Promise<string> => {
-    try {
-      const response = await api.get('/api/auth/google/photos/url');
-      return response.data.url;
-    } catch (error) {
-      console.error('Error getting Google Photos auth URL:', error);
-      throw new Error('Failed to get Google Photos auth URL');
-    }
-  },
-
   handleGoogleCallback: async (code: string): Promise<void> => {
     try {
       await api.post('/api/auth/google/callback', { code });
     } catch (error) {
       console.error('Error handling Google callback:', error);
       throw new Error('Failed to handle Google callback');
-    }
-  },
-
-  handleGooglePhotosCallback: async (code: string): Promise<void> => {
-    try {
-      await api.post('/api/auth/google/photos/callback', { code });
-    } catch (error) {
-      console.error('Error handling Google Photos callback:', error);
-      throw new Error('Failed to handle Google Photos callback');
     }
   },
 }; 

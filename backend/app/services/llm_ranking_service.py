@@ -6,18 +6,25 @@ import re
 import cohere
 import requests
 import base64
-from typing import Any, Dict, List
+import logging
+from typing import Any, Dict, List, Optional
 from app.config import Config
+
+logger = logging.getLogger(__name__)
 
 class LLMBasedRankingService:
     """
-    Uses a single multimodal LLM call to score images on multiple axes,
-    then ranks them by the returned overall score.
+    Service for ranking images using a multimodal LLM. Scores images on multiple axes and ranks them by overall score.
     """
 
-    def __init__(self, model_name: str = "c4ai-aya-vision-8b"):
+    def __init__(self, model_name: str = "c4ai-aya-vision-8b") -> None:
         """
-        :param model_name: the Cohere vision-capable model to call
+        Initialize the LLM-based ranking service.
+
+        Args:
+            model_name (str): The Cohere vision-capable model to call.
+        Raises:
+            ValueError: If the Cohere API key is not set.
         """
         api_key = Config.COHERE_API_KEY
         if not api_key:
@@ -27,7 +34,14 @@ class LLMBasedRankingService:
 
     def _download_and_encode_image(self, image_url: str) -> str:
         """
-        Downloads an image from a URL and converts it to base64.
+        Download an image from a URL and convert it to base64.
+
+        Args:
+            image_url (str): The URL of the image to download.
+        Returns:
+            str: The base64-encoded image string.
+        Raises:
+            Exception: If the image cannot be downloaded or encoded.
         """
         try:
             response = requests.get(image_url)
@@ -36,9 +50,20 @@ class LLMBasedRankingService:
             base64_image = base64.b64encode(image_data).decode('utf-8')
             return f"data:image/jpeg;base64,{base64_image}"
         except Exception as e:
+            logger.error(f"Failed to download and encode image: {str(e)}", exc_info=True)
             raise Exception(f"Failed to download and encode image: {str(e)}")
 
-    def _build_messages(self, image_url: str, description: str, metadata: Dict[str, Any]):
+    def _build_messages(self, image_url: str, description: str, metadata: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Build the message payload for the LLM API call.
+
+        Args:
+            image_url (str): The image URL (base64-encoded).
+            description (str): The image description.
+            metadata (dict): The image metadata.
+        Returns:
+            list: The message payload for the LLM.
+        """
         system_prompt = """You are an expert photo curator and social-media strategist.
 For the image and metadata I provide, evaluate each dimension on a scale from 0 (worst) to 10 (best):
 
@@ -142,48 +167,52 @@ Respond **only** with valid JSON, for example:
 
     def _get_best_quality_url(self, base_url: str) -> str:
         """
-        Gets the highest quality image URL from Google Photos.
-        Removes any size restrictions and adds the highest quality parameter.
+        Get the highest quality image URL from Google Photos.
+
+        Args:
+            base_url (str): The base URL of the image.
+        Returns:
+            str: The URL for the highest quality image.
         """
-        # Remove any existing size parameters
         url = base_url.split('=')[0]
-        # Add the highest quality parameter
-        return f"{url}=d"  # 'd' parameter requests the original image
+        return f"{url}=d"
 
     def rate_image(self, item: Dict[str, Any]) -> Dict[str, float]:
         """
-        Sends the image + metadata to the LLM, parses and returns the JSON ratings.
+        Send the image and metadata to the LLM and parse the returned JSON ratings.
+
+        Args:
+            item (dict): The image item with metadata.
+        Returns:
+            dict: The scores for each axis and overall.
+        Raises:
+            Exception: If the LLM response cannot be parsed as JSON.
         """
         image_url = self._get_best_quality_url(item['baseUrl'])
         messages = self._build_messages(image_url, item['description'], item['mediaMetadata'])
-
         response = self.client.chat(
             model=self.model,
             messages=messages,
             max_tokens=500
         )
-        
         content = response.message.content[0].text
-
         try:
             return json.loads(content)
         except json.JSONDecodeError:
             match = re.search(r"\{.*\}", content, re.DOTALL)
             if match:
                 return json.loads(match.group())
+            logger.error("Failed to parse LLM response as JSON.")
             raise
 
     def rank_images(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        media_items: [
-          {"id": "...",
-           "description": "...",
-           "filename": "...",
-           "baseUrl": "...",
-           "mediaMetadata": {"creationTime": "..."},
-           ...
-        ]
-        Returns the same list with added 'scores' and sorted by 'overall' desc.
+        Rank a list of images by their overall LLM score.
+
+        Args:
+            items (list): List of image items with metadata.
+        Returns:
+            list: The same list with added 'scores' and sorted by 'overall' descending.
         """
         out = []
         for it in items:
@@ -192,5 +221,4 @@ Respond **only** with valid JSON, for example:
             it["scores"] = scores
             it["overall"] = scores.get("overall", 0.0)
             out.append(it)
-        # sort highest overall first
         return sorted(out, key=lambda x: x["overall"], reverse=True)

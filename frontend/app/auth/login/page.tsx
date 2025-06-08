@@ -105,7 +105,7 @@ export default function LoginPage() {
       subtitle="Don't have an account?"
       linkHref="/auth/register"
       linkLabel="Sign up"
-      error={error}
+      error={error && <div aria-live="polite">{error}</div>}
       onGoogleAuth={handleGoogleLogin}
       googleButtonText="Sign in with Google"
     >
@@ -122,7 +122,7 @@ export default function LoginPage() {
               setErrors(prev => ({ ...prev, email: undefined }));
             }
           }}
-          error={errors.email}
+          error={errors.email || undefined}
           disabled={loading}
           aria-describedby={errors.email ? 'email-error' : undefined}
         />
@@ -140,7 +140,7 @@ export default function LoginPage() {
             }
           }}
           showPasswordToggle
-          error={errors.password}
+          error={errors.password || undefined}
           disabled={loading}
           aria-describedby={errors.password ? 'password-error' : undefined}
         />
@@ -166,6 +166,8 @@ export default function LoginPage() {
               href="/auth/forgot-password" 
               className="font-medium text-blue-600 hover:text-blue-500 transition-colors duration-200"
               tabIndex={loading ? -1 : 0}
+              aria-disabled={loading}
+              style={loading ? { pointerEvents: 'none', opacity: 0.5 } : {}}
             >
               Forgot your password?
             </Link>
@@ -179,6 +181,15 @@ export default function LoginPage() {
           disabled={loading}
         >
           {loading ? 'Signing in...' : 'Sign in'}
+        </Button>
+        <Button
+          type="button"
+          onClick={handleGoogleLogin}
+          loading={loading}
+          className="w-full mt-2"
+          disabled={loading}
+        >
+          Sign in with Google
         </Button>
       </form>
     </AuthFormLayout>

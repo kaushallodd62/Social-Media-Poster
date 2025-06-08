@@ -1,37 +1,42 @@
 import os
 from dotenv import load_dotenv
 import secrets
+import logging
+from typing import Optional, List, Dict, Any
 
 # Load environment variables from .env file
 load_dotenv()
 
-def generate_secret_key():
-    """Generate a random secret key and store it in .env file if it doesn't exist."""
+logger = logging.getLogger(__name__)
+
+def generate_secret_key() -> str:
+    """
+    Generate a random secret key and store it in .env file if it doesn't exist.
+    Returns:
+        str: The secret key.
+    """
     if not os.getenv('SECRET_KEY'):
-        # Generate a random 32-byte hex string
         secret_key = secrets.token_hex(32)
-        
-        # Read the current .env file
-        with open('.env', 'r') as f:
-            env_content = f.read()
-        
-        # Add or update the SECRET_KEY
-        if 'SECRET_KEY=' in env_content:
-            # Replace existing SECRET_KEY
-            env_content = env_content.replace('SECRET_KEY=your-secret-key-here', f'SECRET_KEY={secret_key}')
-        else:
-            # Add new SECRET_KEY
-            env_content += f'\nSECRET_KEY={secret_key}'
-        
-        # Write back to .env file
-        with open('.env', 'w') as f:
-            f.write(env_content)
-        
+        try:
+            with open('.env', 'r') as f:
+                env_content = f.read()
+            if 'SECRET_KEY=' in env_content:
+                env_content = env_content.replace('SECRET_KEY=your-secret-key-here', f'SECRET_KEY={secret_key}')
+            else:
+                env_content += f'\nSECRET_KEY={secret_key}'
+            with open('.env', 'w') as f:
+                f.write(env_content)
+            logger.info("Generated and stored new SECRET_KEY in .env file.")
+        except Exception as e:
+            logger.error(f"Failed to generate/store SECRET_KEY: {str(e)}", exc_info=True)
+            raise
         return secret_key
-    
     return os.getenv('SECRET_KEY')
 
 class Config:
+    """
+    Configuration class for Flask app, database, OAuth, CORS, logging, and email.
+    """
     # Flask Configuration
     SECRET_KEY = generate_secret_key()
     FLASK_APP = os.getenv('FLASK_APP', 'app.py')

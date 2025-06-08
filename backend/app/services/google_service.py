@@ -1,4 +1,6 @@
 import os
+import logging
+from typing import Optional, List, Dict, Any
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
@@ -8,23 +10,39 @@ from app.extensions import db
 from app.config import Config
 import secrets
 from datetime import datetime, timedelta
+import requests
+
+logger = logging.getLogger(__name__)
 
 class GoogleService:
-    def __init__(self):
+    """
+    Service for handling Google OAuth and API interactions, including token management and user info retrieval.
+    """
+    def __init__(self) -> None:
+        """
+        Initialize GoogleService with configuration and required scopes.
+        """
         self.client_id = Config.GOOGLE_CLIENT_ID
         self.client_secret = Config.GOOGLE_CLIENT_SECRET
         self.redirect_uri = Config.GOOGLE_REDIRECT_URI
-        # Define all required scopes upfront
-        self.required_scopes = [
+        self.required_scopes: List[str] = [
             'openid',
             'https://www.googleapis.com/auth/userinfo.email',
             'https://www.googleapis.com/auth/userinfo.profile',
             'https://www.googleapis.com/auth/photoslibrary.readonly'
         ]
 
-    def get_auth_url(self, access_type='offline', include_granted_scopes='false'):
-        """Get Google OAuth URL"""
-        print("Generating Google OAuth URL")
+    def get_auth_url(self, access_type: str = 'offline', include_granted_scopes: bool = False) -> str:
+        """
+        Generate Google OAuth URL for user authentication.
+
+        Args:
+            access_type (str): OAuth access type ('offline' or 'online').
+            include_granted_scopes (bool): Whether to include previously granted scopes.
+
+        Returns:
+            str: The Google OAuth authorization URL.
+        """
         try:
             flow = Flow.from_client_config(
                 {
@@ -38,32 +56,28 @@ class GoogleService:
                 scopes=self.required_scopes,
                 redirect_uri=self.redirect_uri
             )
-            
-            print("Created flow object")
-            print(f"Using redirect URI: {self.redirect_uri}")
-            print(f"Using scopes: {self.required_scopes}")
-            
-            # Generate state parameter
             state = secrets.token_urlsafe(32)
-            
+            include_granted_scopes_str = str(include_granted_scopes).lower()
             auth_url, _ = flow.authorization_url(
                 access_type=access_type,
-                include_granted_scopes=include_granted_scopes,
+                include_granted_scopes=include_granted_scopes_str,
                 state=state
             )
-            
-            print(f"Generated auth URL: {auth_url}")
-            return auth_url, state
+            return auth_url
         except Exception as e:
-            print(f"Error generating auth URL: {str(e)}")
-            print(f"Error type: {type(e)}")
-            import traceback
-            print(f"Traceback: {traceback.format_exc()}")
+            logger.error(f"Error generating auth URL: {str(e)}", exc_info=True)
             raise
 
-    def get_tokens(self, code):
-        """Exchange authorization code for tokens"""
-        print("Exchanging authorization code for tokens")
+    def get_tokens(self, code: str) -> Dict[str, Any]:
+        """
+        Exchange authorization code for tokens.
+
+        Args:
+            code (str): The authorization code from Google OAuth.
+
+        Returns:
+            dict: Token information including access and refresh tokens.
+        """
         try:
             flow = Flow.from_client_config(
                 {
@@ -77,229 +91,184 @@ class GoogleService:
                 scopes=self.required_scopes,
                 redirect_uri=self.redirect_uri
             )
-            
-            print("Created flow object")
-            print(f"Using redirect URI: {self.redirect_uri}")
-            print(f"Using scopes: {self.required_scopes}")
-            
             tokens = flow.fetch_token(
                 code=code,
                 client_id=self.client_id,
                 client_secret=self.client_secret
             )
-            
-            print(f"Got tokens: {tokens}")
-            print(f"Access token: {tokens['access_token'][:10]}...")
-            print(f"Refresh token: {tokens.get('refresh_token', 'None')[:10] if tokens.get('refresh_token') else 'None'}...")
-            print(f"Expires in: {tokens.get('expires_in')}")
-            print(f"Scopes: {tokens.get('scope', '').split()}")
-            
+            scopes = tokens.get('scope', [])
+            if isinstance(scopes, str):
+                scopes = scopes.split()
+            # Only log if tokeninfo fetch fails
+            tokeninfo_url = f"https://www.googleapis.com/oauth2/v1/tokeninfo?access_token={tokens['access_token']}"
+            try:
+                requests.get(tokeninfo_url)
+            except Exception as e:
+                logger.warning(f"Error fetching tokeninfo: {e}")
             return tokens
         except Exception as e:
-            print(f"Error getting tokens: {str(e)}")
-            print(f"Error type: {type(e)}")
-            import traceback
-            print(f"Traceback: {traceback.format_exc()}")
+            logger.error(f"Error getting tokens: {str(e)}", exc_info=True)
             raise
 
-    def get_user_info(self, access_token):
-        """Get user info from Google"""
+    def get_user_info(self, access_token: str) -> Dict[str, Any]:
+        """
+        Get user info from Google using an access token.
+
+        Args:
+            access_token (str): The Google OAuth access token.
+
+        Returns:
+            dict: User information from Google.
+        """
         service = build('oauth2', 'v2', credentials=Credentials(access_token))
         return service.userinfo().get().execute()
 
-    def store_credentials(self, user_id, provider, tokens):
-        """Store OAuth credentials in database"""
-        print(f"Storing credentials for user {user_id}, provider {provider}")
-        print(f"Tokens: {tokens}")
-        
+    def store_credentials(self, user_id: int, provider: str, tokens: Dict[str, Any]) -> None:
+        """
+        Store OAuth credentials in the database.
+
+        Args:
+            user_id (int): The user's ID.
+            provider (str): The OAuth provider name.
+            tokens (dict): Token information to store.
+        """
         credentials = OAuthCredentials.query.filter_by(
             user_id=user_id,
             provider=provider
         ).first()
-
         if not credentials:
-            print("Creating new credentials record")
             credentials = OAuthCredentials(
                 user_id=user_id,
                 provider=provider
             )
-
+            logger.info(f"Created new credentials record for user_id={user_id}, provider={provider}")
         credentials.access_token = tokens['access_token']
         credentials.refresh_token = tokens.get('refresh_token')
         credentials.token_type = tokens.get('token_type', 'Bearer')
-        
-        # Convert expires_in (seconds) to datetime
         if 'expires_in' in tokens:
             credentials.token_expires_at = datetime.utcnow() + timedelta(seconds=tokens['expires_in'])
-        
-        credentials.set_scopes(tokens.get('scopes', []))
-        
-        print(f"Stored scopes: {credentials.scope}")
-        print(f"Stored access token: {credentials.access_token[:10]}...")
-        print(f"Stored refresh token: {credentials.refresh_token[:10] if credentials.refresh_token else 'None'}...")
-        print(f"Stored token expires at: {credentials.token_expires_at}")
-        
+        else:
+            credentials.token_expires_at = datetime.utcnow() + timedelta(hours=1)
+        scopes = tokens.get('scope')
+        if scopes:
+            if isinstance(scopes, str):
+                scopes = scopes.split()
+            if not scopes:
+                logger.warning("Empty scopes list being passed to set_scopes!")
+            credentials.set_scopes(scopes)
+        else:
+            credentials.set_scopes(self.required_scopes)
         try:
             db.session.add(credentials)
             db.session.commit()
-            print("Successfully stored credentials")
+            logger.info(f"Stored/updated credentials for user_id={user_id}, provider={provider}")
         except Exception as e:
-            print(f"Error storing credentials: {str(e)}")
-            print(f"Error type: {type(e)}")
-            import traceback
-            print(f"Traceback: {traceback.format_exc()}")
+            logger.error(f"Error storing credentials: {str(e)}", exc_info=True)
             db.session.rollback()
             raise
 
-    def get_credentials(self, user_id, provider):
-        """Get stored OAuth credentials"""
-        print(f"Getting credentials for user {user_id}, provider {provider}")
-        
+    def _get_and_refresh_credentials(self, user_id: int, provider: str) -> Optional[Credentials]:
+        """
+        Fetch credentials from DB, refresh if expired, update DB, and return Credentials object or None.
+
+        Args:
+            user_id (int): The user's ID.
+            provider (str): The OAuth provider name.
+
+        Returns:
+            Credentials or None: A valid Credentials object, or None if not found or refresh failed.
+        """
         credentials = OAuthCredentials.query.filter_by(
             user_id=user_id,
             provider=provider
         ).first()
-
         if not credentials:
-            print("No credentials found")
             return None
-
-        print(f"Found credentials with scopes: {credentials.scope}")
-        print(f"Access token: {credentials.access_token[:10]}...")
-        print(f"Refresh token: {credentials.refresh_token[:10] if credentials.refresh_token else 'None'}...")
-        print(f"Token expires at: {credentials.token_expires_at}")
-        
-        # Create credentials object from stored tokens
         creds = Credentials(
             token=credentials.access_token,
             refresh_token=credentials.refresh_token,
             token_uri="https://oauth2.googleapis.com/token",
             client_id=self.client_id,
             client_secret=self.client_secret,
-            scopes=credentials.scope.split() if credentials.scope else self.required_scopes
+            scopes=credentials.get_scopes() if credentials.scope else self.required_scopes
         )
-
-        print(f"Created credentials object with scopes: {creds.scopes}")
-
-        # Check if token needs refresh
         if creds.expired and creds.refresh_token:
-            print("Token expired, attempting refresh")
             try:
                 creds.refresh(Request())
-                print("Token refreshed successfully")
-                print(f"New access token: {creds.token[:10]}...")
-                print(f"New expiry: {creds.expiry}")
-                # Update stored credentials
                 credentials.access_token = creds.token
                 credentials.token_expires_at = creds.expiry
                 db.session.commit()
+                logger.info(f"Token refreshed for user_id={user_id}, provider={provider}")
             except Exception as e:
-                print(f"Error refreshing token: {str(e)}")
-                print(f"Error type: {type(e)}")
-                import traceback
-                print(f"Traceback: {traceback.format_exc()}")
-                # If refresh fails, clear the credentials
-                db.session.delete(credentials)
-                db.session.commit()
-                raise Exception("Failed to refresh token. Please re-authenticate.")
-
+                logger.error(f"Error refreshing token: {str(e)}", exc_info=True)
+                logger.warning("Failed to refresh token. Clearing credentials.")
+                self.clear_credentials(user_id, provider)
+                return None
         return creds
 
-    def verify_credentials(self, user_id, provider):
-        """Verify that OAuth credentials are valid"""
-        print(f"Verifying credentials for user {user_id}, provider {provider}")
+    def get_credentials(self, user_id: int, provider: str) -> Optional[Credentials]:
+        """
+        Get stored OAuth credentials, refreshing if needed.
+
+        Args:
+            user_id (int): The user's ID.
+            provider (str): The OAuth provider name.
+
+        Returns:
+            Credentials or None: A valid Credentials object, or None if not found or refresh failed.
+        """
+        return self._get_and_refresh_credentials(user_id, provider)
+
+    def verify_credentials(self, user_id: int, provider: str) -> bool:
+        """
+        Verify that OAuth credentials are valid by making test API calls.
+
+        Args:
+            user_id (int): The user's ID.
+            provider (str): The OAuth provider name.
+
+        Returns:
+            bool: True if credentials are valid, False otherwise.
+        """
         try:
             credentials = self.get_credentials(user_id, provider)
             if not credentials:
-                print("No credentials found")
+                logger.warning("No credentials found or failed to refresh.")
                 return False
-
-            print(f"Got credentials with scopes: {credentials.scopes}")
-            print(f"Access token: {credentials.token[:10]}...")
-            print(f"Refresh token: {credentials.refresh_token[:10] if credentials.refresh_token else 'None'}...")
-            print(f"Token expires at: {credentials.expiry}")
-
-            # Check if token needs refresh
-            if credentials.expired and credentials.refresh_token:
-                print("Token expired, attempting refresh")
-                try:
-                    credentials.refresh(Request())
-                    print("Token refreshed successfully")
-                    print(f"New access token: {credentials.token[:10]}...")
-                    print(f"New expiry: {credentials.expiry}")
-                    # Update stored credentials
-                    stored_credentials = OAuthCredentials.query.filter_by(
-                        user_id=user_id,
-                        provider=provider
-                    ).first()
-                    if stored_credentials:
-                        stored_credentials.access_token = credentials.token
-                        stored_credentials.token_expires_at = credentials.expiry
-                        db.session.commit()
-                        print("Updated stored credentials")
-                except Exception as e:
-                    print(f"Error refreshing token: {str(e)}")
-                    print(f"Error type: {type(e)}")
-                    import traceback
-                    print(f"Traceback: {traceback.format_exc()}")
-                    # If refresh fails, clear the credentials
-                    if 'invalid_grant' in str(e).lower():
-                        print("Invalid grant error, clearing credentials")
-                        self.clear_credentials(user_id, provider)
-                        return False
-                    raise
-
-            # Test OAuth2 service
-            print("Testing OAuth2 service")
             oauth2_service = build('oauth2', 'v2', credentials=credentials)
             user_info = oauth2_service.userinfo().get().execute()
-            print(f"Got user info: {user_info}")
-
-            # Test Photos API service
-            print("Testing Photos API service")
             photos_service = build('photoslibrary', 'v1', credentials=credentials)
             test_response = photos_service.mediaItems().list(pageSize=1).execute()
-            print(f"Got test response: {test_response}")
-
+            if not test_response.get('mediaItems'):
+                albums_response = photos_service.albums().list(pageSize=5).execute()
+            logger.info(f"Successfully verified credentials for user_id={user_id}, provider={provider}")
             return True
         except Exception as e:
-            print(f"Error verifying credentials: {str(e)}")
-            print(f"Error type: {type(e)}")
-            import traceback
-            print(f"Traceback: {traceback.format_exc()}")
+            logger.error(f"Error verifying credentials: {str(e)}", exc_info=True)
             return False
 
-    def clear_credentials(self, user_id, provider):
-        """Clear stored OAuth credentials"""
-        print(f"Clearing credentials for user {user_id}, provider {provider}")
-        
+    def clear_credentials(self, user_id: int, provider: str) -> None:
+        """
+        Clear stored OAuth credentials for a user and provider.
+
+        Args:
+            user_id (int): The user's ID.
+            provider (str): The OAuth provider name.
+        """
         credentials = OAuthCredentials.query.filter_by(
             user_id=user_id,
             provider=provider
         ).first()
-
         if credentials:
-            print(f"Found credentials with scopes: {credentials.scope}")
-            print(f"Access token: {credentials.access_token[:10]}...")
-            print(f"Refresh token: {credentials.refresh_token[:10] if credentials.refresh_token else 'None'}...")
-            print(f"Token expires at: {credentials.token_expires_at}")
-            
-            # Clear stored credentials
             credentials.access_token = None
             credentials.refresh_token = None
             credentials.token_expires_at = None
             credentials.scope = None
-            
-            print("Cleared stored credentials")
-            
             try:
                 db.session.add(credentials)
                 db.session.commit()
-                print("Successfully cleared credentials")
+                logger.info(f"Cleared credentials for user_id={user_id}, provider={provider}")
             except Exception as e:
-                print(f"Error clearing credentials: {str(e)}")
-                print(f"Error type: {type(e)}")
-                import traceback
-                print(f"Traceback: {traceback.format_exc()}")
+                logger.error(f"Error clearing credentials: {str(e)}", exc_info=True)
                 db.session.rollback()
                 raise 

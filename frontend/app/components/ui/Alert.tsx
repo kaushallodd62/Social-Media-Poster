@@ -61,7 +61,7 @@ const Alert: React.FC<AlertProps> = ({
     <div className={`rounded-md ${bgColor} border ${borderColor} p-4 ${className}`}>
       <div className="flex">
         <div className="flex-shrink-0">
-          <Icon className={`h-5 w-5 ${iconColor}`} aria-hidden="true" />
+          <Icon className={`h-5 w-5 ${iconColor}`} aria-hidden="true" role="img" />
         </div>
         <div className="ml-3 flex-1">
           {title && (

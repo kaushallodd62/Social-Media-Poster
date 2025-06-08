@@ -1,8 +1,15 @@
 from app.extensions import db
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from datetime import datetime
+from typing import Optional, Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 class MediaRanking(db.Model):
+    """
+    SQLAlchemy model for storing the ranking of a media item in a ranking session.
+    """
     __tablename__ = "media_rankings"
     
     id = db.Column(db.BigInteger, primary_key=True)
@@ -19,8 +26,12 @@ class MediaRanking(db.Model):
         db.Index("idx_media_rankings_session_score", "ranking_session_id", "combined_score"),
     )
 
-    def to_dict(self):
-        """Convert media ranking to dictionary"""
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert media ranking to dictionary.
+        Returns:
+            dict: Dictionary representation of the media ranking.
+        """
         return {
             'id': self.id,
             'ranking_session_id': self.ranking_session_id,

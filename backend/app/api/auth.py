@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, redirect, url_for, g
+from flask import Blueprint, request, jsonify, redirect, url_for, g, make_response
 from flask_jwt_extended import (
     create_access_token, jwt_required, get_jwt_identity, create_refresh_token
 )
@@ -12,94 +12,92 @@ import secrets
 import string
 from functools import wraps
 from app.config import Config
+import logging
+from typing import Optional, List, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__)
 google_service = GoogleService()
 
-def generate_token(length=32):
-    """Generate a random token of specified length."""
+def generate_token(length: int = 32) -> str:
+    """
+    Generate a random token of specified length.
+
+    Args:
+        length (int): Length of the token.
+    Returns:
+        str: The generated token.
+    """
     alphabet = string.ascii_letters + string.digits
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 def token_required(f):
+    """
+    Decorator to require a valid token for a route.
+    """
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
         auth_header = request.headers.get('Authorization')
-        
         if auth_header and auth_header.startswith('Bearer '):
             token = auth_header.split(' ')[1]
-        
         if not token:
+            logger.warning('Token is missing in request header.')
             return jsonify({'message': 'Token is missing'}), 401
-        
         try:
             user = User.verify_auth_token(token)
             if not user:
+                logger.warning('Invalid token provided.')
                 return jsonify({'message': 'Invalid token'}), 401
             g.current_user = user
-        except Exception:
+        except Exception as e:
+            logger.warning(f'Exception during token verification: {str(e)}')
             return jsonify({'message': 'Invalid token'}), 401
-            
         return f(*args, **kwargs)
     return decorated
 
 # Google OAuth Routes
 @auth_bp.route('/api/auth/google/url', methods=['GET'])
-def get_google_auth_url():
-    """Get Google OAuth URL for login"""
+def get_google_auth_url() -> Any:
+    """
+    Get Google OAuth URL for login.
+    Returns:
+        JSON response with the OAuth URL or error.
+    """
     try:
         url = google_service.get_auth_url(
-            scopes=[
-                'openid',
-                'https://www.googleapis.com/auth/userinfo.email',
-                'https://www.googleapis.com/auth/userinfo.profile'
-            ],
             access_type='offline',
-            include_granted_scopes='false'
+            include_granted_scopes=True
         )
         return jsonify({'url': url})
     except Exception as e:
+        logger.error(f"Failed to generate Google OAuth URL: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @auth_bp.route('/api/auth/google/callback', methods=['GET'])
-def google_callback():
-    """Handle Google OAuth callback"""
+def google_callback() -> Any:
+    """
+    Handle Google OAuth callback.
+    Returns:
+        Redirect response to frontend with token or error.
+    """
     try:
-        # Get authorization code from request
         code = request.args.get('code')
-        state = request.args.get('state')  # For CSRF protection
-        
         if not code:
-            return redirect(
-                f"{Config.FRONTEND_URL}/auth/callback?error=No code provided"
-            )
-
-        # Exchange code for tokens and get user info
-        tokens = google_service.get_tokens(
-            auth_code=code,
-            scopes=[
-                'openid',
-                'https://www.googleapis.com/auth/userinfo.email',
-                'https://www.googleapis.com/auth/userinfo.profile'
-            ]
-        )
+            logger.warning('No code provided in Google OAuth callback.')
+            return redirect(f"{Config.FRONTEND_URL}/auth/callback#error=No code provided")
+        tokens = google_service.get_tokens(code)
         if not tokens or not tokens.get('access_token'):
-            return redirect(
-                f"{Config.FRONTEND_URL}/auth/callback?error=Failed to get access token"
-            )
-
+            logger.warning('Failed to get access token from Google.')
+            return redirect(f"{Config.FRONTEND_URL}/auth/callback#error=Failed to get access token")
         try:
             user_info = google_service.get_user_info(tokens['access_token'])
         except Exception as e:
-            return redirect(
-                f"{Config.FRONTEND_URL}/auth/callback?error=Failed to get user info: {str(e)}"
-            )
-
-        # Get or create user
+            logger.error(f"Failed to get user info from Google: {str(e)}", exc_info=True)
+            return redirect(f"{Config.FRONTEND_URL}/auth/callback#error=Failed to get user info: {str(e)}")
         user = User.query.filter_by(email=user_info['email']).first()
         if not user:
-            # Create new user
             user = User(
                 email=user_info['email'],
                 display_name=user_info.get('name', user_info['email'].split('@')[0]),
@@ -108,58 +106,42 @@ def google_callback():
             )
             db.session.add(user)
             db.session.flush()
-
-        # Store OAuth credentials
-        oauth_cred = OAuthCredentials.query.filter_by(
-            user_id=user.id,
-            provider='google'
-        ).first()
-        
-        if not oauth_cred:
-            oauth_cred = OAuthCredentials(
-                user_id=user.id,
-                provider='google',
-                provider_user_id=user_info['id']
-            )
-        
-        oauth_cred.access_token = tokens['access_token']
-        oauth_cred.refresh_token = tokens.get('refresh_token')
-        oauth_cred.token_type = tokens.get('token_type') # Google always returns Bearer
-        oauth_cred.token_expires_at = (
-            datetime.fromtimestamp(tokens.get('expires_in'))
-            if tokens.get('expires_in') else None
+            logger.info(f"Created new user via Google OAuth: {user.email}")
+        google_service.store_credentials(user.id, 'google', tokens)
+        access_token = create_access_token(identity=user.id, expires_delta=timedelta(hours=1))
+        refresh_token = create_refresh_token(identity=user.id, expires_delta=timedelta(days=7))
+        response = make_response(redirect(f"{Config.FRONTEND_URL}/auth/callback#token={access_token}"))
+        response.set_cookie(
+            'refresh_token',
+            refresh_token,
+            httponly=True,
+            secure=True,
+            samesite='Lax',
+            max_age=7*24*60*60,
+            path='/api/auth/refresh'
         )
-        
-        db.session.add(oauth_cred)
-        db.session.commit()
-
-        # Create access and refresh tokens
-        access_token = create_access_token(identity=user.id)
-        refresh_token = create_refresh_token(identity=user.id)
-
-        # Redirect to frontend with tokens
-        return redirect(
-            f"{Config.FRONTEND_URL}/auth/callback?token={access_token}&refresh_token={refresh_token}"
-        )
-
+        logger.info(f"User {user.email} logged in via Google OAuth.")
+        return response
     except Exception as e:
         db.session.rollback()
-        error_message = str(e).replace('\n', ' ').strip()  # Remove newlines and extra whitespace
-        return redirect(f"{Config.FRONTEND_URL}/auth/callback?error={error_message}")
+        error_message = str(e).replace('\n', ' ').strip()
+        logger.error(f"Google OAuth callback failed: {error_message}", exc_info=True)
+        return redirect(f"{Config.FRONTEND_URL}/auth/callback#error={error_message}")
 
 # Email/Password Authentication Routes
 @auth_bp.route('/api/auth/register', methods=['POST'])
-def register():
-    """Register a new user"""
+def register() -> Any:
+    """
+    Register a new user.
+    Returns:
+        JSON response with user info or error.
+    """
     try:
         data = request.get_json()
-        
         if not data or not data.get('email') or not data.get('password'):
             return jsonify({'message': 'Missing required fields'}), 400
-            
         if User.query.filter_by(email=data['email']).first():
             return jsonify({'message': 'Email already registered'}), 400
-            
         user = User(
             email=data['email'],
             display_name=data.get('display_name', ''),
@@ -167,12 +149,10 @@ def register():
         )
         user.set_password(data['password'])
         user.verification_token = generate_token()
-        
         db.session.add(user)
         db.session.commit()
-        
+        logger.info(f"User registered: {user.email}")
         # TODO: Send verification email
-        
         return jsonify({
             'message': 'Registration successful. Please check your email to verify your account.',
             'user': {
@@ -183,27 +163,29 @@ def register():
         }), 201
     except Exception as e:
         db.session.rollback()
+        logger.error(f"User registration failed: {str(e)}", exc_info=True)
         return jsonify({'message': str(e)}), 500
 
 @auth_bp.route('/api/auth/login', methods=['POST'])
-def login():
-    """Login with email and password"""
+def login() -> Any:
+    """
+    Login with email and password.
+    Returns:
+        JSON response with access token and user info or error.
+    """
     try:
         data = request.get_json()
-        
         if not data or not data.get('email') or not data.get('password'):
             return jsonify({'message': 'Missing required fields'}), 400
-            
         user = User.query.filter_by(email=data['email']).first()
-        
         if not user or not user.check_password(data['password']):
+            logger.warning(f"Failed login attempt for email: {data.get('email')}")
             return jsonify({'message': 'Invalid email or password'}), 401
-            
         if not user.is_verified:
+            logger.warning(f"Unverified user login attempt: {user.email}")
             return jsonify({'message': 'Please verify your email first'}), 401
-            
-        access_token = create_access_token(identity=user.id)
-        
+        access_token = create_access_token(identity=user.id, expires_delta=timedelta(hours=1))
+        refresh_token = create_refresh_token(identity=user.id, expires_delta=timedelta(days=7))
         response = jsonify({
             'access_token': access_token,
             'user': {
@@ -212,62 +194,85 @@ def login():
                 'display_name': user.display_name
             }
         })
-        
+        response.set_cookie(
+            'refresh_token',
+            refresh_token,
+            httponly=True,
+            secure=True,
+            samesite='Lax',
+            max_age=7*24*60*60,
+            path='/api/auth/refresh'
+        )
+        logger.info(f"User logged in: {user.email}")
         return response
     except Exception as e:
+        logger.error(f"Login failed: {str(e)}", exc_info=True)
         return jsonify({'message': str(e)}), 500
 
 @auth_bp.route('/api/auth/refresh', methods=['POST'])
 @jwt_required(refresh=True)
-def refresh():
-    """Refresh access token"""
+def refresh() -> Any:
+    """
+    Refresh access token.
+    Returns:
+        JSON response with new access token or error.
+    """
     try:
         user_id = get_jwt_identity()
         access_token = create_access_token(identity=user_id)
+        logger.info(f"Refreshed access token for user_id={user_id}")
         return jsonify({'access_token': access_token})
     except Exception as e:
+        logger.error(f"Token refresh failed: {str(e)}", exc_info=True)
         return jsonify({'message': str(e)}), 500
 
 @auth_bp.route('/api/auth/verify-email/<token>', methods=['GET'])
-def verify_email(token):
-    """Verify user email"""
+def verify_email(token: str) -> Any:
+    """
+    Verify user email.
+    Args:
+        token (str): Verification token.
+    Returns:
+        JSON response with success or error message.
+    """
     try:
         user = User.query.filter_by(verification_token=token).first()
-        
         if not user:
             return jsonify({'message': 'Invalid verification token'}), 400
-            
         user.is_verified = True
         user.verification_token = None
         db.session.commit()
-        
+        logger.info(f"User email verified: {user.email}")
         return jsonify({'message': 'Email verified successfully'})
     except Exception as e:
         db.session.rollback()
+        logger.error(f"Email verification failed: {str(e)}", exc_info=True)
         return jsonify({'message': str(e)}), 500
 
 @auth_bp.route('/api/auth/forgot-password', methods=['POST'])
-def forgot_password():
-    """Request password reset"""
+def forgot_password() -> Any:
+    """
+    Request password reset.
+    Returns:
+        JSON response with success message or error.
+    """
     try:
         data = request.get_json()
-        
         if not data or not data.get('email'):
             return jsonify({'message': 'Email is required'}), 400
-            
         user = User.query.filter_by(email=data['email']).first()
-        
         if user:
             user.reset_password_token = generate_token()
             user.reset_password_expires = datetime.utcnow() + timedelta(hours=1)
             db.session.commit()
+            logger.info(f"Password reset requested for user: {user.email}")
             # TODO: Send password reset email
-            
         return jsonify({
             'message': 'If your email is registered, you will receive password reset instructions'
         })
     except Exception as e:
         db.session.rollback()
+        logger.error(f"Password reset request failed: {str(e)}", exc_info=True)
         return jsonify({'message': str(e)}), 500
 
 @auth_bp.route('/api/auth/reset-password', methods=['POST'])
@@ -313,50 +318,4 @@ def get_current_user():
             'is_verified': user.is_verified
         })
     except Exception as e:
-        return jsonify({'message': str(e)}), 500
-
-# Google Photos Integration Routes
-@auth_bp.route('/api/auth/google/photos/url', methods=['GET'])
-@jwt_required()
-def get_google_photos_auth_url():
-    """Get Google OAuth URL for Photos access"""
-    try:
-        url = google_service.get_auth_url(
-            scopes=['https://www.googleapis.com/auth/photoslibrary.readonly'],
-            access_type='offline',
-            include_granted_scopes='true'
-        )
-        return jsonify({'url': url})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@auth_bp.route('/api/auth/google/photos/callback', methods=['GET'])
-@jwt_required()
-def google_photos_callback():
-    """Handle Google Photos OAuth callback"""
-    try:
-        user_id = get_jwt_identity()
-        code = request.args.get('code')
-        if not code:
-            return redirect(
-                url_for('frontend.photos', error='No code provided')
-            )
-
-        # Exchange code for tokens
-        tokens = google_service.get_tokens(
-            code,
-            scopes=['https://www.googleapis.com/auth/photoslibrary.readonly']
-        )
-        
-        # Store tokens in database
-        user = User.query.get(user_id)
-        if not user:
-            return redirect(url_for('frontend.photos', error='User not found'))
-
-        # Store tokens in oauth_credentials table
-        google_service.store_credentials(user_id, 'google_photos', tokens)
-
-        return redirect(url_for('frontend.photos'))
-
-    except Exception as e:
-        return redirect(url_for('frontend.photos', error=str(e))) 
+        return jsonify({'message': str(e)}), 500 

@@ -34,20 +34,6 @@ export default function PhotosPage() {
     fetchPhotos();
   }, []);
 
-  const handleConnect = async () => {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/google/photos/url`);
-      const data = await response.json();
-      window.location.href = data.url;
-    } catch (err: unknown) {
-      let message = 'Failed to connect to Google Photos';
-      if (err && typeof err === 'object' && 'message' in err && typeof (err as { message?: string }).message === 'string') {
-        message = (err as { message?: string }).message!;
-      }
-      setError(message);
-    }
-  };
-
   const handleDisconnect = async () => {
     try {
       await photosApi.disconnect();
@@ -79,7 +65,6 @@ export default function PhotosPage() {
             Please make sure:
             <ul className="list-disc list-inside mt-2">
               <li>The backend server is running at {process.env.NEXT_PUBLIC_API_URL}</li>
-              <li>You have authenticated with Google Photos</li>
               <li>Check the browser console for more details</li>
             </ul>
           </p>
@@ -94,29 +79,22 @@ export default function PhotosPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Your Photos</h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
-            {photos.length > 0 ? `${photos.length} photos found` : 'Connect your Google Photos to get started'}
+            {photos.length > 0 ? `${photos.length} photos found` : 'No photos found.'}
           </p>
         </div>
-        {photos.length > 0 ? (
+        {photos.length > 0 && (
           <Button
             onClick={handleDisconnect}
             variant="danger"
           >
             Disconnect Google Photos
           </Button>
-        ) : (
-          <Button
-            onClick={handleConnect}
-            variant="primary"
-          >
-            Connect Google Photos
-          </Button>
         )}
       </div>
       
       {!photos || photos.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-500 dark:text-gray-400">No photos found. Please connect your Google Photos account to get started.</p>
+          <p className="text-gray-500 dark:text-gray-400">No photos found.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

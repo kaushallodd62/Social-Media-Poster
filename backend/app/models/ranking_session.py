@@ -1,7 +1,14 @@
 from app.extensions import db
 from datetime import datetime
+from typing import Optional, Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 class RankingSession(db.Model):
+    """
+    SQLAlchemy model for a ranking session, representing a user's image ranking process.
+    """
     __tablename__ = "ranking_sessions"
     
     id = db.Column(db.BigInteger, primary_key=True)
@@ -14,8 +21,12 @@ class RankingSession(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
     updated_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now(), onupdate=db.func.now())
 
-    def to_dict(self):
-        """Convert ranking session to dictionary"""
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert ranking session to dictionary.
+        Returns:
+            dict: Dictionary representation of the ranking session.
+        """
         return {
             'id': self.id,
             'user_id': self.user_id,

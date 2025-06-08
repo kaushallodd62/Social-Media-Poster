@@ -9,6 +9,7 @@ export const API_ENDPOINTS = {
     login: '/api/auth/login',
     register: '/api/auth/register',
     logout: '/api/auth/logout',
+    refresh: '/api/auth/refresh',
   },
   posts: {
     create: '/api/posts',

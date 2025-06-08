@@ -1,9 +1,9 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useId } from 'react';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
-  error?: string;
+  error?: React.ReactNode;
   showPasswordToggle?: boolean;
   icon?: React.ReactNode;
 }
@@ -12,6 +12,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, showPasswordToggle, icon, className = '', type = 'text', ...props }, ref) => {
     const [showPassword, setShowPassword] = React.useState(false);
     const inputType = showPasswordToggle ? (showPassword ? 'text' : 'password') : type;
+    const id = useId();
 
     const baseClasses = `
       appearance-none block w-full px-3 py-2 border rounded-md shadow-sm 
@@ -28,7 +29,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="space-y-1">
         {label && (
-          <label className="block text-sm font-medium text-gray-700">
+          <label htmlFor={id} className="block text-sm font-medium text-gray-700">
             {label}
           </label>
         )}
@@ -41,6 +42,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           <input
             ref={ref}
             type={inputType}
+            id={label ? id : undefined}
             className={`${baseClasses} ${className}`}
             {...props}
           />
@@ -59,7 +61,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
         </div>
         {error && (
-          <p className="text-sm text-red-600">{error}</p>
+          <span className="text-sm text-red-600" aria-live="polite">{error}</span>
         )}
       </div>
     );

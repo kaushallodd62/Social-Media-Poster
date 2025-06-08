@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/app/contexts/AuthContext';
-import AuthFormLayout from '@/app/components/AuthFormLayout';
-import { Input, Button } from '@/app/components/ui';
+import { useAuth } from '../../contexts/AuthContext';
+import AuthFormLayout from '../../components/AuthFormLayout';
+import { Input, Button } from '../../components/ui';
+
 
 interface FormErrors {
   displayName?: string;
@@ -91,13 +92,13 @@ export default function RegisterPage() {
           type="text"
           required
           value={displayName}
-          onChange={(e) => {
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
             setDisplayName(e.target.value);
             if (errors.displayName) {
               setErrors(prev => ({ ...prev, displayName: undefined }));
             }
           }}
-          error={errors.displayName}
+          error={errors.displayName || undefined}
         />
 
         <Input
@@ -106,13 +107,13 @@ export default function RegisterPage() {
           autoComplete="email"
           required
           value={email}
-          onChange={(e) => {
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
             setEmail(e.target.value);
             if (errors.email) {
               setErrors(prev => ({ ...prev, email: undefined }));
             }
           }}
-          error={errors.email}
+          error={errors.email || undefined}
         />
 
         <Input
@@ -121,22 +122,32 @@ export default function RegisterPage() {
           autoComplete="new-password"
           required
           value={password}
-          onChange={(e) => {
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
             setPassword(e.target.value);
             if (errors.password) {
               setErrors(prev => ({ ...prev, password: undefined }));
             }
           }}
           showPasswordToggle
-          error={errors.password}
+          error={errors.password || undefined}
         />
 
         <Button
           type="submit"
           loading={loading}
           className="w-full"
+          disabled={loading}
         >
           {loading ? 'Creating account...' : 'Create account'}
+        </Button>
+        <Button
+          type="button"
+          onClick={handleGoogleLogin}
+          loading={loading}
+          className="w-full mt-2"
+          disabled={loading}
+        >
+          Sign up with Google
         </Button>
       </form>
     </AuthFormLayout>

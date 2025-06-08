@@ -1,8 +1,15 @@
 from app.extensions import db
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from datetime import datetime
+from typing import Optional, Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 class MediaItem(db.Model):
+    """
+    SQLAlchemy model for a media item (photo) belonging to a user.
+    """
     __tablename__ = "media_items"
     
     id = db.Column(db.BigInteger, primary_key=True)
@@ -26,8 +33,12 @@ class MediaItem(db.Model):
         db.UniqueConstraint("user_id", "google_media_id", name="uq_user_media"),
     )
 
-    def to_dict(self):
-        """Convert media item to dictionary"""
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert media item to dictionary.
+        Returns:
+            dict: Dictionary representation of the media item.
+        """
         return {
             'id': self.id,
             'user_id': self.user_id,
