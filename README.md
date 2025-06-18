@@ -35,6 +35,26 @@ A full-stack application for managing and scheduling social media posts with AI-
 - Google Cloud Platform account with Photos API enabled
 - Google OAuth 2.0 credentials
 
+## OAuth Permissions
+
+This application uses Google OAuth for one-time photo selection via the Google Photos Picker (frontend). Persistent access to the user's entire Google Photos library is no longer required or supported.
+
+**Required Scopes:**
+- `openid`
+- `https://www.googleapis.com/auth/userinfo.email`
+- `https://www.googleapis.com/auth/userinfo.profile`
+- `https://www.googleapis.com/auth/photospicker.mediaitems.readonly` (for photo selection via the Google Photos Picker)
+
+> **Note:**
+> - The frontend picker uses the `photospicker.mediaitems.readonly` scope for selecting photos without persistent access.
+> - The backend no longer requests or stores persistent access tokens for the user's Google Photos library.
+
+## Photo Selection Model
+
+- Users can open the Google Photos Picker any number of times to select photos or videos for use in the app.
+- The app does **not** require persistent access to the user's entire Google Photos library.
+- Each selection is user-driven and explicit; no background sync or bulk import is performed.
+
 ## Setup
 
 1. Clone the repository:
@@ -151,7 +171,7 @@ The application consists of three services:
 
 ## Features
 
-- Google Photos Integration (OAuth 2.0)
+- Google Photos Picker Integration (OAuth 2.0, user-driven selection)
 - AI-powered Image Ranking
 - Photo Metadata Extraction
 - Social Media Post Scheduling

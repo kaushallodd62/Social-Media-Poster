@@ -22,10 +22,13 @@ export default function Topbar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const avatarRef = useRef<HTMLDivElement>(null);
 
-  // Avoid hydration mismatch
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    console.log('Theme changed:', theme);
+  }, [theme]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -45,7 +48,9 @@ export default function Topbar() {
   }, [dropdownOpen]);
 
   const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    console.log('Current theme:', theme, 'Setting theme to:', newTheme);
+    setTheme(newTheme);
   };
 
   let avatarUrl: string | undefined = undefined;
@@ -77,13 +82,26 @@ export default function Topbar() {
         />
       </div>
       <div className="flex items-center space-x-4">
-        <button
-          className={`w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200 ${theme === 'dark' ? 'ring-2 ring-blue-400' : ''}`}
-          onClick={toggleTheme}
-          aria-label="Toggle theme"
-        >
-          {theme === 'dark' ? <SunIcon className="h-6 w-6 text-yellow-400" /> : <MoonIcon className="h-6 w-6 text-blue-600" />}
-        </button>
+        <div className="flex items-center">
+          <button
+            type="button"
+            aria-label="Toggle theme"
+            onClick={toggleTheme}
+            className={`relative w-14 h-8 rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500
+              ${theme === 'dark' ? 'bg-gray-700' : 'bg-yellow-300'}`}
+          >
+            <span className={`absolute left-1 top-1 transition-opacity duration-300 ${theme === 'dark' ? 'opacity-0' : 'opacity-100'}`}>
+              <SunIcon className="h-6 w-6 text-yellow-500" />
+            </span>
+            <span className={`absolute right-1 top-1 transition-opacity duration-300 ${theme === 'dark' ? 'opacity-100' : 'opacity-0'}`}>
+              <MoonIcon className="h-6 w-6 text-blue-500" />
+            </span>
+            <span
+              className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow-md transform transition-transform duration-300
+                ${theme === 'dark' ? 'translate-x-6' : 'translate-x-0'}`}
+            />
+          </button>
+        </div>
         <div className="relative" ref={avatarRef}>
           <button
             onClick={() => setDropdownOpen((open) => !open)}

@@ -30,225 +30,7 @@ def health_check() -> Any:
     """
     return jsonify({"status": "healthy"})
 
-# Get list of photos from Google Photos
-@routes_bp.route('/api/photos')
-@jwt_required()
-def get_photos() -> Any:
-    """
-    Get list of photos from Google Photos for the current user.
-    Returns:
-        JSON response with photos or error.
-    """
-    try:
-        user_id = get_jwt_identity()
-        google_service = GoogleService()
-        creds = google_service.get_credentials(user_id, 'google')
-        service = build('photoslibrary', 'v1', credentials=creds, static_discovery=False)
-        response = service.mediaItems().list(pageSize=50).execute()
-        items = response.get('mediaItems', [])
-        items.sort(key=lambda x: x['mediaMetadata']['creationTime'], reverse=True)
-        return jsonify({'success': True, 'photos': items})
-    except Exception as e:
-        logger.error(f"Failed to get photos: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'error': str(e)})
-
-@routes_bp.route('/api/photo/<photo_id>')
-def get_photo(photo_id: str) -> Any:
-    """
-    Get a specific photo from Google Photos by ID.
-    Args:
-        photo_id (str): The Google Photos media item ID.
-    Returns:
-        JSON response with photo or error.
-    """
-    try:
-        user_id = get_jwt_identity()
-        google_service = GoogleService()
-        creds = google_service.get_credentials(user_id, 'google')
-        service = build('photoslibrary', 'v1', credentials=creds, static_discovery=False)
-        photo = service.mediaItems().get(mediaItemId=photo_id).execute()
-        return jsonify({'success': True, 'photo': photo})
-    except Exception as e:
-        logger.error(f"Failed to get photo {photo_id}: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'error': str(e)})
-
-@routes_bp.route('/api/photos/top-picks')
-@jwt_required()
-def get_top_picks() -> Any:
-    """
-    Get top 20 photos from the latest completed ranking session for the current user.
-    Returns:
-        JSON response with top photos.
-    """
-    user_id = get_jwt_identity()
-    latest_session = RankingSession.query.filter(
-        RankingSession.user_id == user_id,
-        RankingSession.completed_at.isnot(None)
-    ).order_by(desc(RankingSession.completed_at)).first()
-    if not latest_session:
-        return jsonify({'photos': []})
-    top_rankings = MediaRanking.query.filter_by(
-        ranking_session_id=latest_session.id
-    ).order_by(desc(MediaRanking.combined_score)).limit(20).all()
-    results = []
-    for ranking in top_rankings:
-        media_item = db.session.get(MediaItem, ranking.media_item_id)
-        if media_item and not media_item.is_deleted:
-            results.append({
-                'google_media_id': media_item.google_media_id,
-                'base_url': media_item.base_url,
-                'combined_score': float(ranking.combined_score),
-                'tags': ranking.tags_json or [],
-                'width': media_item.width,
-                'height': media_item.height
-            })
-    return jsonify({'photos': results})
-
-@routes_bp.route('/api/photos/sync', methods=['POST'])
-@jwt_required()
-def sync_photos() -> Any:
-    """
-    Sync photos from Google Photos to the local database for the current user.
-    Returns:
-        JSON response with sync status.
-    """
-    user_id = get_jwt_identity()
-    try:
-        google_service = GoogleService()
-        creds = google_service.get_credentials(user_id, 'google')
-        service = build('photoslibrary', 'v1', credentials=creds, static_discovery=False)
-        response = service.mediaItems().list(pageSize=50).execute()
-        items = response.get('mediaItems', [])
-        for mediaItem in items:
-            existing = MediaItem.query.filter_by(
-                user_id=user_id,
-                google_media_id=mediaItem['id']
-            ).first()
-            if existing:
-                existing.base_url = mediaItem['baseUrl']
-                existing.filename = mediaItem.get('filename')
-                existing.mime_type = mediaItem.get('mimeType')
-                existing.creation_time = datetime.fromisoformat(mediaItem['mediaMetadata']['creationTime'].replace('Z', '+00:00'))
-                existing.width = mediaItem['mediaMetadata'].get('width')
-                existing.height = mediaItem['mediaMetadata'].get('height')
-                existing.last_synced_at = datetime.utcnow()
-            else:
-                new_item = MediaItem(
-                    user_id=user_id,
-                    google_media_id=mediaItem['id'],
-                    base_url=mediaItem['baseUrl'],
-                    filename=mediaItem.get('filename'),
-                    mime_type=mediaItem.get('mimeType'),
-                    creation_time=datetime.fromisoformat(mediaItem['mediaMetadata']['creationTime'].replace('Z', '+00:00')),
-                    width=mediaItem['mediaMetadata'].get('width'),
-                    height=mediaItem['mediaMetadata'].get('height')
-                )
-                db.session.add(new_item)
-        db.session.commit()
-        logger.info(f"Photos synced for user_id={user_id}")
-        return jsonify({'success': True, 'message': 'Photos synced successfully'})
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Photo sync failed for user_id={user_id}: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@routes_bp.route('/api/photos/rank', methods=['POST'])
-@jwt_required()
-def rank_photos() -> Any:
-    """
-    Rank all non-deleted photos for the current user using the LLM ranking service.
-    Returns:
-        JSON response with ranking status.
-    """
-    user_id = get_jwt_identity()
-    try:
-        session = RankingSession(
-            user_id=user_id,
-            method='ai_ranking'
-        )
-        db.session.add(session)
-        db.session.flush()
-        photos = MediaItem.query.filter_by(
-            user_id=user_id,
-            is_deleted=False
-        ).all()
-        for photo in photos:
-            google_service = GoogleService()
-            creds = google_service.get_credentials(user_id, 'google')
-            service = build('photoslibrary', 'v1', credentials=creds, static_discovery=False)
-            google_photo = service.mediaItems().get(mediaItemId=photo.google_media_id).execute()
-            photo_data = {
-                'id': google_photo['id'],
-                'description': google_photo.get('description', ''),
-                'filename': google_photo['filename'],
-                'baseUrl': google_photo['baseUrl'],
-                'mediaMetadata': google_photo['mediaMetadata'],
-            }
-            scores = ranking_service.rate_image(photo_data)
-            ranking = MediaRanking(
-                ranking_session_id=session.id,
-                media_item_id=photo.id,
-                technical_score=scores.get('technical', 0.0),
-                aesthetic_score=scores.get('aesthetic', 0.0),
-                combined_score=scores.get('overall', 0.0),
-                llm_reasoning=scores.get('reasoning'),
-                tags_json=scores.get('tags', [])
-            )
-            db.session.add(ranking)
-        session.completed_at = datetime.utcnow()
-        db.session.commit()
-        logger.info(f"Photos ranked for user_id={user_id}, session_id={session.id}")
-        return jsonify({'success': True, 'message': 'Photos ranked successfully'})
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Photo ranking failed for user_id={user_id}: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@routes_bp.route('/api/photos/disconnect', methods=['POST'])
-@jwt_required()
-def disconnect_photos() -> Any:
-    """
-    Disconnect from Google Photos by removing OAuth credentials for the current user.
-    Returns:
-        JSON response with disconnect status.
-    """
-    try:
-        user_id = get_jwt_identity()
-        oauth_cred = OAuthCredentials.query.filter_by(
-            user_id=user_id,
-            provider='google'
-        ).first()
-        if oauth_cred:
-            db.session.delete(oauth_cred)
-            db.session.commit()
-            logger.info(f"Disconnected Google Photos for user_id={user_id}")
-            return jsonify({'success': True, 'message': 'Successfully disconnected from Google Photos'})
-        else:
-            return jsonify({'success': False, 'error': 'No Google Photos connection found'}), 404
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Failed to disconnect Google Photos for user_id={user_id}: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@routes_bp.route('/api/photos/connection-status')
-@jwt_required()
-def check_photos_connection() -> Any:
-    """
-    Check if the current user is connected to Google Photos.
-    Returns:
-        JSON response with connection status.
-    """
-    try:
-        user_id = get_jwt_identity()
-        google_service = GoogleService()
-        creds = google_service.get_credentials(user_id, 'google')
-        service = build('photoslibrary', 'v1', credentials=creds, static_discovery=False)
-        service.mediaItems().list(pageSize=1).execute()
-        return jsonify({'success': True, 'connected': True})
-    except Exception as e:
-        logger.error(f"Failed to check Google Photos connection: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'connected': False, 'error': str(e)})
-
+# --- Media endpoints (Picker-based) ---
 @routes_bp.route('/api/media/items', methods=['GET'])
 @jwt_required()
 def get_media_items() -> Any:
@@ -260,6 +42,7 @@ def get_media_items() -> Any:
     try:
         user_id = get_jwt_identity()
         items = MediaItem.query.filter_by(user_id=user_id).all()
+        logger.info(f"Fetched {len(items)} media items for user_id={user_id}")
         return jsonify([item.to_dict() for item in items])
     except Exception as e:
         logger.error(f"Failed to get media items: {str(e)}", exc_info=True)
@@ -279,7 +62,9 @@ def get_media_item(item_id: int) -> Any:
         user_id = get_jwt_identity()
         item = MediaItem.query.filter_by(id=item_id, user_id=user_id).first()
         if not item:
+            logger.warning(f"Media item {item_id} not found for user_id={user_id}")
             return jsonify({'error': 'Media item not found'}), 404
+        logger.info(f"Fetched media item {item_id} for user_id={user_id}")
         return jsonify(item.to_dict())
     except Exception as e:
         logger.error(f"Failed to get media item {item_id}: {str(e)}", exc_info=True)
@@ -297,6 +82,7 @@ def create_media_item() -> Any:
         user_id = get_jwt_identity()
         data = request.get_json()
         if not data or not data.get('base_url') or not data.get('google_media_id'):
+            logger.warning(f"Missing base_url or google_media_id in create_media_item for user_id={user_id}")
             return jsonify({'error': 'base_url and google_media_id are required'}), 400
         item = MediaItem(
             user_id=user_id,
@@ -332,6 +118,7 @@ def update_media_item(item_id: int) -> Any:
         user_id = get_jwt_identity()
         item = MediaItem.query.filter_by(id=item_id, user_id=user_id).first()
         if not item:
+            logger.warning(f"Media item {item_id} not found for user_id={user_id}")
             return jsonify({'error': 'Media item not found'}), 404
         data = request.get_json()
         if data.get('title'):
@@ -342,8 +129,6 @@ def update_media_item(item_id: int) -> Any:
             item.base_url = data['base_url']
         if data.get('google_media_id'):
             item.google_media_id = data['google_media_id']
-        if data.get('media_type'):
-            item.media_type = data['media_type']
         if data.get('filename'):
             item.filename = data['filename']
         db.session.commit()
@@ -368,6 +153,7 @@ def delete_media_item(item_id: int) -> Any:
         user_id = get_jwt_identity()
         item = MediaItem.query.filter_by(id=item_id, user_id=user_id).first()
         if not item:
+            logger.warning(f"Media item {item_id} not found for user_id={user_id}")
             return jsonify({'error': 'Media item not found'}), 404
         db.session.delete(item)
         db.session.commit()
@@ -377,6 +163,38 @@ def delete_media_item(item_id: int) -> Any:
         db.session.rollback()
         logger.error(f"Failed to delete media item {item_id}: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+@routes_bp.route('/api/photos/top-picks')
+@jwt_required()
+def get_top_picks() -> Any:
+    """
+    Get top 20 photos from the latest completed ranking session for the current user.
+    Returns:
+        JSON response with top photos.
+    """
+    user_id = get_jwt_identity()
+    latest_session = RankingSession.query.filter(
+        RankingSession.user_id == user_id,
+        RankingSession.completed_at.isnot(None)
+    ).order_by(desc(RankingSession.completed_at)).first()
+    if not latest_session:
+        return jsonify({'photos': []})
+    top_rankings = MediaRanking.query.filter_by(
+        ranking_session_id=latest_session.id
+    ).order_by(desc(MediaRanking.combined_score)).limit(20).all()
+    results = []
+    for ranking in top_rankings:
+        media_item = db.session.get(MediaItem, ranking.media_item_id)
+        if media_item and not media_item.is_deleted:
+            results.append({
+                'google_media_id': media_item.google_media_id,
+                'base_url': media_item.base_url,
+                'combined_score': float(ranking.combined_score),
+                'tags': ranking.tags_json or [],
+                'width': media_item.width,
+                'height': media_item.height
+            })
+    return jsonify({'photos': results})
 
 @routes_bp.route('/api/ranking/sessions', methods=['GET'])
 @jwt_required()
@@ -475,4 +293,65 @@ def rank_media_items(session_id):
         return jsonify(session.to_dict())
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@routes_bp.route('/api/media/items/batch', methods=['POST'])
+@jwt_required()
+def batch_create_media_items() -> Any:
+    """
+    Batch create or update media items for the current user.
+    Accepts a list of media item metadata from the frontend (Google Photos Picker).
+    Returns:
+        JSON response with the stored media items (with DB IDs) or error.
+    """
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+        if not isinstance(data, list):
+            return jsonify({'error': 'Request body must be a list of media items'}), 400
+        stored_items = []
+        for item in data:
+            google_media_id = item.get('google_media_id') or item.get('id')
+            base_url = item.get('base_url') or item.get('baseUrl')
+            if not google_media_id or not base_url:
+                logger.warning(f"Missing google_media_id or base_url in item: {item}")
+                continue
+            # Check if item already exists for this user
+            existing = MediaItem.query.filter_by(user_id=user_id, google_media_id=google_media_id).first()
+            if existing:
+                # Update fields if changed
+                existing.base_url = base_url
+                existing.filename = item.get('filename')
+                existing.mime_type = item.get('mime_type') or item.get('mimeType')
+                existing.description = item.get('description', '')
+                existing.creation_time = item.get('creation_time') or item.get('creationTime')
+                existing.width = item.get('width')
+                existing.height = item.get('height')
+                existing.duration = item.get('duration')
+                existing.thumbnail_url = item.get('thumbnail_url') or item.get('thumbnailUrl')
+                existing.last_synced_at = datetime.utcnow()
+                logger.info(f"Updated media item {existing.id} for user_id={user_id}")
+                db.session.add(existing)
+                stored_items.append(existing)
+            else:
+                new_item = MediaItem(
+                    user_id=user_id,
+                    google_media_id=google_media_id,
+                    base_url=base_url,
+                    filename=item.get('filename'),
+                    mime_type=item.get('mime_type') or item.get('mimeType'),
+                    description=item.get('description', ''),
+                    creation_time=item.get('creation_time') or item.get('creationTime'),
+                    width=item.get('width'),
+                    height=item.get('height'),
+                    duration=item.get('duration'),
+                    thumbnail_url=item.get('thumbnail_url') or item.get('thumbnailUrl'),
+                )
+                db.session.add(new_item)
+                stored_items.append(new_item)
+        db.session.commit()
+        return jsonify([item.to_dict() for item in stored_items]), 201
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to batch create media items: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500 

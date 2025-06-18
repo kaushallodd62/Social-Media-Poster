@@ -20,6 +20,10 @@ class MediaRanking(db.Model):
     combined_score = db.Column(db.Numeric(5,2))
     llm_reasoning = db.Column(JSONB)  # For storing AI reasoning about the photo
     tags_json = db.Column(ARRAY(db.Text))
+    analysis_type = db.Column(db.String(32), nullable=True)  # e.g., 'default', 'v2', etc.
+    status = db.Column(db.String(20), default='completed')  # 'pending', 'completed', 'failed', etc.
+    error_message = db.Column(db.Text, nullable=True)  # For failed analyses
+    analyzed_at = db.Column(db.DateTime(timezone=True), nullable=True)  # When analysis completed
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
 
     __table_args__ = (
@@ -41,5 +45,9 @@ class MediaRanking(db.Model):
             'combined_score': float(self.combined_score) if self.combined_score else None,
             'llm_reasoning': self.llm_reasoning,
             'tags_json': self.tags_json,
+            'analysis_type': self.analysis_type,
+            'status': self.status,
+            'error_message': self.error_message,
+            'analyzed_at': self.analyzed_at.isoformat() if self.analyzed_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }

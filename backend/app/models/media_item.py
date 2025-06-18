@@ -28,6 +28,10 @@ class MediaItem(db.Model):
     tags_json = db.Column(ARRAY(db.Text))
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
     updated_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now(), onupdate=db.func.now())
+    duration = db.Column(db.Integer, nullable=True)  # Duration in seconds for videos
+    thumbnail_url = db.Column(db.Text, nullable=True)  # Thumbnail for UI
+    ai_status = db.Column(db.String(20), default='pending')  # 'pending', 'analyzed', etc.
+    latest_ranking_id = db.Column(db.BigInteger, db.ForeignKey('media_rankings.id'), nullable=True)
 
     __table_args__ = (
         db.UniqueConstraint("user_id", "google_media_id", name="uq_user_media"),
@@ -50,10 +54,14 @@ class MediaItem(db.Model):
             'creation_time': self.creation_time.isoformat() if self.creation_time else None,
             'width': self.width,
             'height': self.height,
+            'duration': self.duration,
+            'thumbnail_url': self.thumbnail_url,
             'is_deleted': self.is_deleted,
             'last_synced_at': self.last_synced_at.isoformat() if self.last_synced_at else None,
             'exif_json': self.exif_json,
             'tags_json': self.tags_json,
+            'ai_status': self.ai_status,
+            'latest_ranking_id': self.latest_ranking_id,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

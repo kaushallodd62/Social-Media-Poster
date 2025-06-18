@@ -105,7 +105,7 @@ export default function LoginPage() {
       subtitle="Don't have an account?"
       linkHref="/auth/register"
       linkLabel="Sign up"
-      error={error && <div aria-live="polite">{error}</div>}
+      error={error || undefined}
       onGoogleAuth={handleGoogleLogin}
       googleButtonText="Sign in with Google"
     >
@@ -153,10 +153,10 @@ export default function LoginPage() {
               type="checkbox"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-700 dark:bg-[#18181b] rounded"
               disabled={loading}
             />
-            <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+            <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900 dark:text-gray-200">
               Remember me
             </label>
           </div>
@@ -164,7 +164,7 @@ export default function LoginPage() {
           <div className="text-sm">
             <Link 
               href="/auth/forgot-password" 
-              className="font-medium text-blue-600 hover:text-blue-500 transition-colors duration-200"
+              className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors duration-200"
               tabIndex={loading ? -1 : 0}
               aria-disabled={loading}
               style={loading ? { pointerEvents: 'none', opacity: 0.5 } : {}}
@@ -181,15 +181,6 @@ export default function LoginPage() {
           disabled={loading}
         >
           {loading ? 'Signing in...' : 'Sign in'}
-        </Button>
-        <Button
-          type="button"
-          onClick={handleGoogleLogin}
-          loading={loading}
-          className="w-full mt-2"
-          disabled={loading}
-        >
-          Sign in with Google
         </Button>
       </form>
     </AuthFormLayout>

@@ -35,11 +35,11 @@ export default function Dashboard() {
   const dashboardSections: DashboardSection[] = [
     {
       title: 'Google Photos',
-      description: 'Connect and sync your Google Photos account',
+      description: 'Pick photos from your Google Photos account as needed. No persistent connection required.',
       icon: PhotoIcon,
       href: '/photos',
-      status: isPhotosConnected ? 'Connected' : 'Not Connected',
-      action: 'Manage',
+      action: 'Pick Photos',
+      status: '',
     },
     {
       title: 'Top Picks',
@@ -95,13 +95,12 @@ export default function Dashboard() {
                   <p className="text-sm text-gray-500 dark:text-gray-400">{section.description}</p>
                 </div>
               </div>
-              <span className={`text-sm px-2 py-1 rounded-full transition-colors duration-200 ${
-                section.status === 'Connected' 
-                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                  : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-              }`}>
-                {section.status}
-              </span>
+              {section.status && section.title !== 'Google Photos' && (
+                <span className={`text-sm px-2 py-1 rounded-full transition-colors duration-200 
+                  bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200`}>
+                  {section.status}
+                </span>
+              )}
             </div>
             <div className="mt-4">
               <Link

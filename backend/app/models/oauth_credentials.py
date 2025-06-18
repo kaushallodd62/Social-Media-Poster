@@ -71,8 +71,7 @@ class OAuthCredentials(db.Model):
         required_scopes = [
             'openid',
             'https://www.googleapis.com/auth/userinfo.email',
-            'https://www.googleapis.com/auth/userinfo.profile',
-            'https://www.googleapis.com/auth/photoslibrary.readonly'
+            'https://www.googleapis.com/auth/userinfo.profile'
         ]
         scopes_set = set(scopes)
         required_set = set(required_scopes)

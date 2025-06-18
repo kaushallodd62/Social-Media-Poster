@@ -32,99 +32,43 @@ const AuthFormLayout: React.FC<AuthFormLayoutProps> = ({
   googleButtonText = 'Continue with Google',
 }) => {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-12 px-4 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Logo */}
-        <div className="flex justify-center">
-          <Link href="/" className="flex items-center space-x-2">
-            <Image
-              src="/logo.png"
-              alt="Logo"
-              width={40}
-              height={40}
-              className="h-10 w-auto"
-            />
-            <span className="text-2xl font-bold text-gray-900">YourApp</span>
-          </Link>
-        </div>
-
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 tracking-tight">
-          {title}
-        </h2>
-        {subtitle && linkText && linkHref && linkLabel && (
-          <p className="mt-2 text-center text-sm text-gray-600">
-            {subtitle}{' '}
-            <Link 
-              href={linkHref} 
-              className="font-medium text-blue-600 hover:text-blue-500 transition-colors duration-200"
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#121212] transition-colors duration-300">
+      <div className="w-full max-w-md p-8 bg-white dark:bg-[#23272f] rounded-xl shadow-2xl border border-gray-200 dark:border-gray-800">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{title}</h1>
+        <div className="flex items-center justify-between mb-6">
+          <span className="text-sm text-gray-600 dark:text-gray-300">
+            {subtitle}
+            <a
+              href={linkHref}
+              className="ml-1 text-blue-600 dark:text-blue-400 hover:underline focus:underline focus:outline-none"
             >
               {linkLabel}
-            </Link>
-          </p>
+            </a>
+          </span>
+        </div>
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded border border-red-200 dark:border-red-700">
+            {error}
+          </div>
         )}
-      </div>
-
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow-xl sm:rounded-lg sm:px-10 transform transition-all duration-200 hover:shadow-2xl">
-          {error && (
-            <Alert 
-              type="error" 
-              message={error} 
-              className="mb-4 animate-fade-in" 
-            />
-          )}
-          
-          {success && (
-            <Alert 
-              type="success" 
-              message={success} 
-              className="mb-4 animate-fade-in" 
-            />
-          )}
-
-          {children}
-
-          {showGoogleAuth && onGoogleAuth && (
-            <>
-              <div className="mt-6">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-300" />
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white text-gray-500">Or continue with</span>
-                  </div>
-                </div>
-
-                <div className="mt-6">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={onGoogleAuth}
-                    className="w-full border border-gray-300 shadow-sm hover:shadow-md transition-all duration-200"
-                    icon={<FcGoogle className="h-5 w-5" />}
-                  >
-                    {googleButtonText}
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="mt-8 text-center text-sm text-gray-600">
-          <p>
-            By continuing, you agree to our{' '}
-            <Link href="/terms" className="font-medium text-blue-600 hover:text-blue-500 transition-colors duration-200">
-              Terms of Service
-            </Link>{' '}
-            and{' '}
-            <Link href="/privacy" className="font-medium text-blue-600 hover:text-blue-500 transition-colors duration-200">
-              Privacy Policy
-            </Link>
-          </p>
-        </div>
+        <div className="space-y-6">{children}</div>
+        {onGoogleAuth && googleButtonText && (
+          <>
+            <div className="my-6 flex items-center">
+              <div className="flex-grow border-t border-gray-300 dark:border-gray-700" />
+              <span className="mx-4 text-gray-500 dark:text-gray-400 text-sm">Or continue with</span>
+              <div className="flex-grow border-t border-gray-300 dark:border-gray-700" />
+            </div>
+            <button
+              type="button"
+              onClick={onGoogleAuth}
+              className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded bg-white dark:bg-[#18181b] border border-gray-300 dark:border-gray-700 shadow-md hover:shadow-lg transition-all duration-200 text-gray-900 dark:text-gray-100 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              <FcGoogle className="h-5 w-5" />
+              {googleButtonText}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

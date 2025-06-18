@@ -28,8 +28,7 @@ class GoogleService:
         self.required_scopes: List[str] = [
             'openid',
             'https://www.googleapis.com/auth/userinfo.email',
-            'https://www.googleapis.com/auth/userinfo.profile',
-            'https://www.googleapis.com/auth/photoslibrary.readonly'
+            'https://www.googleapis.com/auth/userinfo.profile'
         ]
 
     def get_auth_url(self, access_type: str = 'offline', include_granted_scopes: bool = False) -> str:
@@ -237,10 +236,11 @@ class GoogleService:
                 return False
             oauth2_service = build('oauth2', 'v2', credentials=credentials)
             user_info = oauth2_service.userinfo().get().execute()
-            photos_service = build('photoslibrary', 'v1', credentials=credentials)
-            test_response = photos_service.mediaItems().list(pageSize=1).execute()
-            if not test_response.get('mediaItems'):
-                albums_response = photos_service.albums().list(pageSize=5).execute()
+            # Removed persistent Photos Library API access
+            # photos_service = build('photoslibrary', 'v1', credentials=credentials)
+            # test_response = photos_service.mediaItems().list(pageSize=1).execute()
+            # if not test_response.get('mediaItems'):
+            #     albums_response = photos_service.albums().list(pageSize=5).execute()
             logger.info(f"Successfully verified credentials for user_id={user_id}, provider={provider}")
             return True
         except Exception as e:
